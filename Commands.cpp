@@ -94,7 +94,7 @@ SmallShell::~SmallShell() {
 Command::Command(const char *cmd_line):
     cmd_line(cmd_line)
 {
-    char** args = new char*[MAX_NUM_ARGS+1];
+    char** args[MAX_NUM_ARGS+1] = {0};
     int numArgs = _parseCommandLine(cmd_line, args)-1;
 
     this->args = args;
