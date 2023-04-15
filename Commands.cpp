@@ -84,7 +84,7 @@ void _removeBackgroundSign(char* cmd_line) {
 // TODO: Add your implementation for classes in Commands.h 
 
 SmallShell::SmallShell() {
-    lastPwdList.push("/home");
+    currPwd = "/home";
 }
 
 SmallShell::~SmallShell() {
@@ -121,7 +121,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
       char** plastPwd = nullptr;
       char* lastPwdCopy = nullptr;
 
-      if(lastPwdList.size() > 1) {
+      if(lastPwdList.size() > 0) {
           plastPwd = lastPwdList.top();
           lastPwdCopy = *(lastPwdList.top());
       }

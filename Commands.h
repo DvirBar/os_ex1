@@ -179,6 +179,7 @@ class SmallShell {
 private:
     SmallShell();
     stack<char**> lastPwdList;
+    char** currPwd;
 
 public:
     Command *CreateCommand(const char* cmd_line);
