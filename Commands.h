@@ -2,19 +2,26 @@
 #define SMASH_COMMAND_H_
 
 #include <vector>
+#include <stack>
 
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
 
+
+using namespace std;
+
 class Command {
-// TODO: Add your data members
- public:
+public:
   Command(const char* cmd_line);
   virtual ~Command();
   virtual void execute() = 0;
   //virtual void prepare();
   //virtual void cleanup();
-  // TODO: Add your extra methods if needed
+
+protected:
+    const char* cmd_line;
+    char** args;
+    int numArgs;
 };
 
 class BuiltInCommand : public Command {
@@ -49,10 +56,15 @@ class RedirectionCommand : public Command {
 };
 
 class ChangeDirCommand : public BuiltInCommand {
-// TODO: Add your data members public:
-  ChangeDirCommand(const char* cmd_line, char** plastPwd);
-  virtual ~ChangeDirCommand() {}
-  void execute() override;
+// TODO: Add your data members
+public:
+    ChangeDirCommand(const char* cmd_line, char** plastPwd);
+    virtual ~ChangeDirCommand() {}
+    void execute() override;
+
+private:
+    char** plastPwd;
+    const char* cmd_line;
 };
 
 class GetCurrDirCommand : public BuiltInCommand {
@@ -77,7 +89,6 @@ public:
   virtual ~QuitCommand() {}
   void execute() override;
 };
-
 
 class JobsList {
  public:
@@ -165,21 +176,24 @@ class KillCommand : public BuiltInCommand {
 };
 
 class SmallShell {
- private:
-  // TODO: Add your data members
-  SmallShell();
- public:
-  Command *CreateCommand(const char* cmd_line);
-  SmallShell(SmallShell const&)      = delete; // disable copy ctor
-  void operator=(SmallShell const&)  = delete; // disable = operator
-  static SmallShell& getInstance() // make SmallShell singleton
-  {
-    static SmallShell instance; // Guaranteed to be destroyed.
+private:
+    SmallShell();
+    stack<char**> lastPwdList;
+
+public:
+    Command *CreateCommand(const char* cmd_line);
+    SmallShell(SmallShell const&)      = delete; // disable copy ctor
+    void operator=(SmallShell const&)  = delete; // disable = operator
+
+    static SmallShell& getInstance() // make SmallShell singleton
+    {
+        static SmallShell instance; // Guaranteed to be destroyed.
     // Instantiated on first use.
-    return instance;
-  }
-  ~SmallShell();
-  void executeCommand(const char* cmd_line);
+        return instance;
+    }
+
+    ~SmallShell();
+    void executeCommand(const char* cmd_line);
   // TODO: add extra methods as needed
 };
 
