@@ -84,7 +84,7 @@ void _removeBackgroundSign(char* cmd_line) {
 // TODO: Add your implementation for classes in Commands.h 
 
 SmallShell::SmallShell() {
-    currPwd = "/home";
+    getcwd(currPwd, 100);
 }
 
 SmallShell::~SmallShell() {
