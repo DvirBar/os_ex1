@@ -68,9 +68,9 @@ void _removeBackgroundSign(char* cmd_line) {
   unsigned int idx = str.find_last_not_of(WHITESPACE);
   // if all characters are spaces then return
   // TODO: recomment
-//  if (idx == string::npos) {
-//    return;
-//  }
+  if (idx == string::npos) {
+    return;
+  }
   // if the command line does not end with & then return
   if (cmd_line[idx] != '&') {
     return;
@@ -84,7 +84,7 @@ void _removeBackgroundSign(char* cmd_line) {
 // TODO: Add your implementation for classes in Commands.h 
 
 SmallShell::SmallShell() {
-// TODO: add your implementation
+    lastPwdList.push("/home");
 }
 
 SmallShell::~SmallShell() {
@@ -121,7 +121,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
       char** plastPwd = nullptr;
       char* lastPwdCopy = nullptr;
 
-      if(lastPwdList.size() != 0) {
+      if(lastPwdList.size() > 1) {
           plastPwd = lastPwdList.top();
           lastPwdCopy = *(lastPwdList.top());
       }
