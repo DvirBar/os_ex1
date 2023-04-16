@@ -67,7 +67,6 @@ void _removeBackgroundSign(char* cmd_line) {
   // find last character other than spaces
   unsigned int idx = str.find_last_not_of(WHITESPACE);
   // if all characters are spaces then return
-  // TODO: recomment
   if (idx == string::npos) {
     return;
   }
@@ -98,7 +97,7 @@ Command::Command(const char *cmd_line):
     int numArgs = _parseCommandLine(cmd_line, args)-1;
 
     this->args = args;
-    this->numArgs = numArgs
+    this->numArgs = numArgs;
 }
 
 /**
