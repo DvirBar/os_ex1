@@ -83,7 +83,8 @@ void _removeBackgroundSign(char* cmd_line) {
 // TODO: Add your implementation for classes in Commands.h 
 
 SmallShell::SmallShell() {
-    getcwd(currPwd, 100);
+    char tempPwd[80];
+    m_currPwd = getcwd(tempPwd, 80);
 }
 
 SmallShell::~SmallShell() {
@@ -91,14 +92,18 @@ SmallShell::~SmallShell() {
 }
 
 Command::Command(const char *cmd_line):
-    cmd_line(cmd_line)
+    m_cmdLine(cmd_line)
 {
-    char** args[MAX_NUM_ARGS+1] = {0};
+    char* args[MAX_NUM_ARGS+1];
     int numArgs = _parseCommandLine(cmd_line, args)-1;
 
-    this->args = args;
-    this->numArgs = numArgs;
+    this->m_args = arg s;
+    this->m_numArgs = numArgs;
 }
+
+BuiltInCommand::BuiltInCommand(const char *cmd_line):
+    Command(cmd_line)
+{}
 
 /**
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
@@ -120,18 +125,18 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
       char** plastPwd = nullptr;
       char* lastPwdCopy = nullptr;
 
-      if(lastPwdList.size() > 0) {
-          plastPwd = lastPwdList.top();
-          lastPwdCopy = *(lastPwdList.top());
+      if(!m_lastPwdList.empty()) {
+          plastPwd = m_lastPwdList.top();
+          lastPwdCopy = *(m_lastPwdList.top());
       }
 
-      ChangeDirCommand* cdCom =  new ChangeDirCommand(cmd_line, plastPwd);
+      auto cdCom =  new ChangeDirCommand(cmd_line, plastPwd);
 
       // If plastPwd wasn't changed, it means that we used "-" argument
       if(*plastPwd == lastPwdCopy) {
-          lastPwdList.pop();
+          m_lastPwdList.pop();
       } else {
-          lastPwdList.push(plastPwd);
+          m_lastPwdList.push(plastPwd);
       }
 
       return cdCom;
@@ -159,7 +164,7 @@ ChangeDirCommand::ChangeDirCommand(const char *cmd_line, char **plastPwd):
         BuiltInCommand(cmd_line),
         plastPwd(plastPwd)
 {
-    if(numArgs > 1) {
+    if(m_numArgs > 1) {
         // TODO: throw exception and use define for 1
         return;
     }

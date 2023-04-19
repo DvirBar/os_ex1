@@ -19,9 +19,9 @@ public:
   //virtual void cleanup();
 
 protected:
-    const char* cmd_line;
-    char** args;
-    int numArgs;
+    const char* m_cmdLine;
+    char** m_args;
+    int m_numArgs;
 };
 
 class BuiltInCommand : public Command {
@@ -178,8 +178,8 @@ class KillCommand : public BuiltInCommand {
 class SmallShell {
 private:
     SmallShell();
-    stack<char**> lastPwdList;
-    char currPwd[80];
+    stack<char**> m_lastPwdList;
+    char* m_currPwd;
 
 public:
     Command *CreateCommand(const char* cmd_line);
