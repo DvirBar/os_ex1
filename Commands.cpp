@@ -5,13 +5,16 @@
 #include <sstream>
 #include <sys/wait.h>
 #include <iomanip>
+#include <exception>
 #include "Commands.h"
+#include "Exception.h"
 
 using namespace std;
 
 const std::string WHITESPACE = " \n\r\t\f\v";
 
 #define MAX_NUM_ARGS 20
+#define RET_VALUE_ERROR -1
 
 #if 0
 #define FUNC_ENTRY()  \
@@ -97,7 +100,7 @@ Command::Command(const char *cmd_line):
     char* args[MAX_NUM_ARGS+1];
     int numArgs = _parseCommandLine(cmd_line, args)-1;
 
-    this->m_args = arg s;
+    this->m_args = args;
     this->m_numArgs = numArgs;
 }
 
@@ -155,14 +158,22 @@ void SmallShell::executeCommand(const char *cmd_line) {
   // TODO: Add your implementation here
 
    Command* cmd = CreateCommand(cmd_line);
-   cmd->execute();
+
+   try {
+       cmd->execute();
+   }
+   catch (const SyscallException& error) {
+       ::perror(error.what());
+   } catch(const exception& error) {
+       cerr << error.what() << endl;
+   }
   // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 
 
 ChangeDirCommand::ChangeDirCommand(const char *cmd_line, char **plastPwd):
         BuiltInCommand(cmd_line),
-        plastPwd(plastPwd)
+        m_plastPwd(plastPwd)
 {
     if(m_numArgs > 1) {
         // TODO: throw exception and use define for 1
@@ -174,16 +185,19 @@ ChangeDirCommand::ChangeDirCommand(const char *cmd_line, char **plastPwd):
     // TODO: more exceptions?
 
 
-    char* arg = args[1];
+    char* arg = m_args[1];
     if(arg == "-" && plastPwd == nullptr) {
         // TODO: throw exception
         return;
     }
 
-    *(this->plastPwd) = arg;
+    *(this->m_plastPwd) = arg;
     *plastPwd = arg;
 }
 
 void ChangeDirCommand::execute() {
-    chdir(*plastPwd);
+    int retValue = chdir(*m_plastPwd);
+    if(retValue == RET_VALUE_ERROR) {
+        throw SyscallException();
+    }
 }

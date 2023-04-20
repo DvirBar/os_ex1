@@ -63,8 +63,7 @@ public:
     void execute() override;
 
 private:
-    char** plastPwd;
-    const char* cmd_line;
+    char** m_plastPwd;
 };
 
 class GetCurrDirCommand : public BuiltInCommand {
