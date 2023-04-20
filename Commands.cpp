@@ -198,6 +198,6 @@ ChangeDirCommand::ChangeDirCommand(const char *cmd_line, char **plastPwd):
 void ChangeDirCommand::execute() {
     int retValue = chdir(*m_plastPwd);
     if(retValue == RET_VALUE_ERROR) {
-        throw SyscallException();
+        throw SyscallChdirError();
     }
 }
