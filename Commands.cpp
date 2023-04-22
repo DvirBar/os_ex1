@@ -95,6 +95,10 @@ SmallShell::~SmallShell() {
 // TODO: add your implementation
 }
 
+const char *SmallShell::getCurrDir() const {
+    return m_currPwd;
+}
+
 const std::string& SmallShell::getPrompt() const {
     return m_smashPrompt;
 }
@@ -186,12 +190,25 @@ void SmallShell::executeCommand(const char *cmd_line) {
 ChangePromptCommand::ChangePromptCommand(const char* cmd_line) :
         BuiltInCommand(cmd_line)
 {
-    m_newPrompt = m_args[1];
+    if(m_numArgs == 1) {
+        char cStringnewPropmpt[] = "smash> ";
+        m_newPrompt = cStringnewPropmpt;
+    }
+    else
+        m_newPrompt = m_args[1];
 }
 
 void ChangePromptCommand::execute() {
     std::string newPrompt = m_newPrompt;
     SmallShell::getInstance().setPrompt(newPrompt);
+}
+
+GetCurrDirCommand::GetCurrDirCommand(const char *cmd_line) :
+        BuiltInCommand(cmd_line)
+{}
+
+void GetCurrDirCommand::execute() {
+    cout << SmallShell::getInstance().getCurrDir() << endl;
 }
 
 

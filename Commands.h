@@ -206,6 +206,7 @@ public:
     void executeCommand(const char* cmd_line);
     const std::string& getPrompt() const;
     void setPrompt(const std::string& new_prompt);
+    const char* getCurrDir() const;
   // TODO: add extra methods as needed
 };
 
