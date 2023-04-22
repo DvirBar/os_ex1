@@ -55,6 +55,15 @@ class RedirectionCommand : public Command {
   //void cleanup() override;
 };
 
+class ChangePromptCommand: public BuiltInCommand {
+public:
+    explicit ChangePromptCommand(const char* cmd_line);
+    ~ChangePromptCommand() override = default;
+    void execute() override;
+private:
+    char* m_newPrompt;
+};
+
 class ChangeDirCommand : public BuiltInCommand {
 // TODO: Add your data members
 public:
@@ -179,6 +188,7 @@ private:
     SmallShell();
     stack<char**> m_lastPwdList;
     char* m_currPwd;
+    std::string m_smashPrompt;
 
 public:
     Command *CreateCommand(const char* cmd_line);
@@ -194,6 +204,8 @@ public:
 
     ~SmallShell();
     void executeCommand(const char* cmd_line);
+    const std::string& getPrompt() const;
+    void setPrompt(const std::string& new_prompt);
   // TODO: add extra methods as needed
 };
 

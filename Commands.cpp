@@ -88,10 +88,19 @@ void _removeBackgroundSign(char* cmd_line) {
 SmallShell::SmallShell() {
     char tempPwd[80];
     m_currPwd = getcwd(tempPwd, 80);
+    m_smashPrompt = "smash> ";
 }
 
 SmallShell::~SmallShell() {
 // TODO: add your implementation
+}
+
+const std::string& SmallShell::getPrompt() const {
+    return m_smashPrompt;
+}
+
+void SmallShell::setPrompt(const std::string &new_prompt) {
+    m_smashPrompt = new_prompt;
 }
 
 Command::Command(const char *cmd_line):
@@ -121,6 +130,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 
   else if (commandStr.compare("showpid") == 0) {
     return new ShowPidCommand(cmd_line);
+  }
+
+  else if(commandStr.compare("chprompt") == 0) {
+      return new ChangePromptCommand(cmd_line);
   }
 
   else if(commandStr.compare("cd")) {
@@ -168,6 +181,17 @@ void SmallShell::executeCommand(const char *cmd_line) {
        cerr << error.what() << endl;
    }
   // Please note that you must fork smash process for some commands (e.g., external commands....)
+}
+
+ChangePromptCommand::ChangePromptCommand(const char* cmd_line) :
+        BuiltInCommand(cmd_line)
+{
+    m_newPrompt = m_args[1];
+}
+
+void ChangePromptCommand::execute() {
+    std::string newPrompt = m_newPrompt;
+    SmallShell::getInstance().setPrompt(newPrompt);
 }
 
 
