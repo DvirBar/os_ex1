@@ -6,6 +6,8 @@
 #include <sys/wait.h>
 #include <iomanip>
 #include <exception>
+#include <signal.h>
+#include <time.h>
 #include "Commands.h"
 #include "Exception.h"
 
@@ -13,7 +15,6 @@ using namespace std;
 
 const std::string WHITESPACE = " \n\r\t\f\v";
 
-#define MAX_NUM_ARGS 20
 #define RET_VALUE_ERROR -1
 
 #if 0
@@ -86,8 +87,7 @@ void _removeBackgroundSign(char* cmd_line) {
 // TODO: Add your implementation for classes in Commands.h 
 
 SmallShell::SmallShell() {
-    char tempPwd[80];
-    m_currPwd = getcwd(tempPwd, 80);
+    m_currPwd = getcwd(nullptr, 0);
     m_smashPrompt = "smash> ";
 }
 
@@ -110,7 +110,7 @@ void SmallShell::setPrompt(const std::string &new_prompt) {
 Command::Command(const char *cmd_line):
     m_cmdLine(cmd_line)
 {
-    char* args[MAX_NUM_ARGS+1];
+    char* args[Command::CMD_MAX_NUM_ARGS+1];
     int numArgs = _parseCommandLine(cmd_line, args)-1;
 
     this->m_args = args;
@@ -141,50 +141,63 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
   }
 
   else if(commandStr.compare("cd")) {
+      return SmallShell::handleChdirCommand(&m_lastPwdList, &m_currPwd, cmd_line);
+  }
 
-      char** plastPwd = nullptr;
-      char* lastPwdCopy = nullptr;
-
-      if(!m_lastPwdList.empty()) {
-          plastPwd = m_lastPwdList.top();
-          lastPwdCopy = *(m_lastPwdList.top());
-      }
-
-      auto cdCom =  new ChangeDirCommand(cmd_line, plastPwd);
-
-      // If plastPwd wasn't changed, it means that we used "-" argument
-      if(*plastPwd == lastPwdCopy) {
-          m_lastPwdList.pop();
-      } else {
-          m_lastPwdList.push(plastPwd);
-      }
-
-      return cdCom;
+  else if(commandStr.compare(("fg"))) {
+      return new ForegroundCommand(cmd_line, getJobsList());
   }
 
  return new ExternalCommand(cmd_line);
 
 }
 
-void ShowPidCommand::execute() {
-    int pid = getpid();
-    cout << "smash pid is " << pid << endl;
+Command* SmallShell::handleChdirCommand(stack<char *> *lastPwdList, char **currPwd, const char *cmd_line) {
+    char** plastPwd = nullptr;
+    char* lastPwdCopy = nullptr;
+
+    if(!lastPwdList->empty()) {
+        plastPwd = &(lastPwdList->top());
+        lastPwdCopy = lastPwdList->top();
+    }
+
+    auto cdCom = new ChangeDirCommand(cmd_line, plastPwd);
+
+    // If plastPwd wasn't changed, it means that we used "-" argument
+    if(*plastPwd == lastPwdCopy) {
+        lastPwdList->pop();
+    } else {
+        lastPwdList->push(*plastPwd);
+        *(currPwd) = *plastPwd;
+    }
+
+    return cdCom;
 }
 
 void SmallShell::executeCommand(const char *cmd_line) {
-  // TODO: Add your implementation here
+    // TODO: Manage job list
 
-   Command* cmd = CreateCommand(cmd_line);
+    Command* cmd = CreateCommand(cmd_line);
 
-   try {
-       cmd->execute();
-   }
-   catch (const SyscallException& error) {
-       ::perror(error.what());
-   } catch(const exception& error) {
-       cerr << error.what() << endl;
-   }
-  // Please note that you must fork smash process for some commands (e.g., external commands....)
+    try {
+        cmd->execute();
+    }
+    catch (const SyscallException& error) {
+        ::perror(error.what());
+    } catch(const exception& error) {
+        cerr << error.what() << endl;
+    }
+    // Please note that you must fork smash process for some commands (e.g., external commands....)
+}
+
+
+ShowPidCommand::ShowPidCommand(const char *cmd_line):
+        BuiltInCommand(cmd_line)
+{}
+
+void ShowPidCommand::execute() {
+    int pid = getpid();
+    cout << "smash pid is " << pid << endl;
 }
 
 ChangePromptCommand::ChangePromptCommand(const char* cmd_line) :
@@ -213,32 +226,116 @@ void GetCurrDirCommand::execute() {
 
 
 ChangeDirCommand::ChangeDirCommand(const char *cmd_line, char **plastPwd):
-        BuiltInCommand(cmd_line),
-        m_plastPwd(plastPwd)
+        BuiltInCommand(cmd_line)
 {
-    if(m_numArgs > 1) {
-        // TODO: throw exception and use define for 1
-        return;
+    if(m_numArgs > MAX_ARGS) {
+        throw TooManyArgsError();
     }
 
     // TODO: check for invalid literals
     // TODO: check for the same path
     // TODO: more exceptions?
 
-
     char* arg = m_args[1];
-    if(arg == "-" && plastPwd == nullptr) {
-        // TODO: throw exception
-        return;
+    if(arg == string("-") && plastPwd == nullptr) {
+        throw NoPWDError();
     }
 
-    *(this->m_plastPwd) = arg;
+    m_lastPwd = arg;
     *plastPwd = arg;
 }
 
 void ChangeDirCommand::execute() {
-    int retValue = chdir(*m_plastPwd);
+    int retValue = chdir(m_lastPwd);
     if(retValue == RET_VALUE_ERROR) {
         throw SyscallChdirError();
     }
+}
+
+ForegroundCommand::ForegroundCommand(const char *cmd_line, JobsList *jobs):
+        BuiltInCommand(cmd_line)
+{
+    int jobId = stoi(m_args[1]);
+
+    if(m_numArgs == Command::NO_ARGS) {
+        jobId = jobs->getMaxJobId();
+    } else if(m_numArgs > ForegroundCommand::FG_MAX_NUM_ARGS) {
+        throw FgInvalidArgumentsError();
+    }
+
+    m_job = jobs->getJobById(jobId);
+}
+
+void ForegroundCommand::execute() {
+    m_job->print();
+
+    if(m_job->isJobStopped()) {
+        kill(m_job->getPid(), SIGCONT);
+    }
+
+    int status;
+    waitpid(m_job->getPid(), &status, 0);
+}
+
+// JOBS
+void JobsList::addJob(Command *cmd, bool isStopped) {
+    int jobId = assignJobId(jobs);
+    auto jobEntry = new JobEntry(jobId, cmd, isStopped);
+    jobs.insert({jobId, jobEntry});
+}
+
+int JobsList::assignJobId(map<int, JobEntry*> jobs) {
+    return jobs.rbegin()->first + 1;
+}
+
+void JobsList::removeJobById(int jobId) {
+    JobEntry* jobEntry = getJobById(jobId);
+    jobs.erase(jobId);
+    delete jobEntry;
+}
+
+JobsList::JobEntry* JobsList::getJobById(int jobId) {
+    auto jobIterator = jobs.find(jobId);
+
+    if(jobIterator == jobs.end()) {
+        throw JobNotFoundError(jobId);
+    }
+
+    return jobIterator->second;
+}
+
+JobsList::JobEntry::JobEntry(int jobId, Command *cmd, bool isStopped):
+    m_jobId(jobId),
+    m_cmd(cmd),
+    m_isStopped(isStopped),
+    m_insertTime(time(nullptr))
+{
+    // TODO: how to get job pid?
+}
+
+void JobsList::JobEntry::print(bool includeTime) const {
+    double timeDiff;
+    string timeStr;
+    time_t currTime = time(nullptr);
+
+    if(includeTime) {
+        timeDiff = difftime(m_insertTime, currTime);
+        timeStr = to_string(timeDiff);
+    }
+
+    string stoppedFlag;
+    if(m_isStopped) {
+        stoppedFlag = " (stopped)";
+    }
+
+    cout << "[" << m_jobId << "] " << m_cmd->getCmdLine() << " : " << m_pid << " "
+    << timeStr << " secs"<< stoppedFlag << endl;
+}
+
+int JobsList::getMaxJobId() const {
+    if(jobs.empty()) {
+        throw JobsListIsEmptyError();
+    }
+
+    return jobs.rbegin()->first;
 }

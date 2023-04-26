@@ -2,7 +2,10 @@
 #define SMASH_COMMAND_H_
 
 #include <vector>
+#include <map>
+#include <list>
 #include <stack>
+#include <time.h>
 
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
@@ -12,27 +15,31 @@ using namespace std;
 
 class Command {
 public:
-  Command(const char* cmd_line);
+  explicit Command(const char* cmd_line);
   virtual ~Command();
   virtual void execute() = 0;
   //virtual void prepare();
   //virtual void cleanup();
+  const char* getCmdLine() const;
 
 protected:
     const char* m_cmdLine;
     char** m_args;
     int m_numArgs;
+
+    static const int NO_ARGS = 1;
+    static const int CMD_MAX_NUM_ARGS = 20;
 };
 
-class BuiltInCommand : public Command {
+class BuiltInCommand: public Command {
  public:
-  BuiltInCommand(const char* cmd_line);
+  explicit BuiltInCommand(const char* cmd_line);
   virtual ~BuiltInCommand() {}
 };
 
-class ExternalCommand : public Command {
+class ExternalCommand: public Command {
  public:
-  ExternalCommand(const char* cmd_line);
+  explicit ExternalCommand(const char* cmd_line);
   virtual ~ExternalCommand() {}
   void execute() override;
 };
@@ -40,12 +47,12 @@ class ExternalCommand : public Command {
 class PipeCommand : public Command {
   // TODO: Add your data members
  public:
-  PipeCommand(const char* cmd_line);
+  explicit PipeCommand(const char* cmd_line);
   virtual ~PipeCommand() {}
   void execute() override;
 };
 
-class RedirectionCommand : public Command {
+class RedirectionCommand: public Command {
  // TODO: Add your data members
  public:
   explicit RedirectionCommand(const char* cmd_line);
@@ -64,7 +71,7 @@ private:
     char* m_newPrompt;
 };
 
-class ChangeDirCommand : public BuiltInCommand {
+class ChangeDirCommand: public BuiltInCommand {
 // TODO: Add your data members
 public:
     ChangeDirCommand(const char* cmd_line, char** plastPwd);
@@ -72,19 +79,20 @@ public:
     void execute() override;
 
 private:
-    char** m_plastPwd;
+    static const int MAX_ARGS = 1;
+    char* m_lastPwd;
 };
 
-class GetCurrDirCommand : public BuiltInCommand {
+class GetCurrDirCommand: public BuiltInCommand {
  public:
-  GetCurrDirCommand(const char* cmd_line);
+  explicit GetCurrDirCommand(const char* cmd_line);
   virtual ~GetCurrDirCommand() {}
   void execute() override;
 };
 
-class ShowPidCommand : public BuiltInCommand {
+class ShowPidCommand: public BuiltInCommand {
  public:
-  ShowPidCommand(const char* cmd_line);
+  explicit ShowPidCommand(const char* cmd_line);
   virtual ~ShowPidCommand() {}
   void execute() override;
 };
@@ -101,21 +109,40 @@ public:
 class JobsList {
  public:
   class JobEntry {
-   // TODO: Add your data members
+  public:
+      JobEntry(int jobId, Command* cmd, bool isStopped);
+      bool isJobStopped() const;
+      pid_t getPid() const;
+      void print(bool includeTime = true) const;
+
+  private:
+      int m_jobId;
+      pid_t m_pid;
+      Command* m_cmd;
+      bool m_isStopped;
+      time_t m_insertTime;
+
+      // TODO: pointer to last stopped job?
   };
- // TODO: Add your data members
  public:
-  JobsList();
+    // TODO: Delete job entries
   ~JobsList();
   void addJob(Command* cmd, bool isStopped = false);
   void printJobsList();
   void killAllJobs();
+  // TODO: remember to delete* jobs!
   void removeFinishedJobs();
   JobEntry * getJobById(int jobId);
   void removeJobById(int jobId);
   JobEntry * getLastJob(int* lastJobId);
   JobEntry *getLastStoppedJob(int *jobId);
+  int getMaxJobId() const;
+  JobEntry* getJobById(char* jobId) const;
   // TODO: Add extra methods or modify exisitng ones as needed
+
+private:
+    static int assignJobId(map<int, JobEntry*> jobs);
+    map<int, JobEntry*> jobs;
 };
 
 class JobsCommand : public BuiltInCommand {
@@ -127,11 +154,13 @@ class JobsCommand : public BuiltInCommand {
 };
 
 class ForegroundCommand : public BuiltInCommand {
- // TODO: Add your data members
  public:
   ForegroundCommand(const char* cmd_line, JobsList* jobs);
   virtual ~ForegroundCommand() {}
   void execute() override;
+private:
+    JobsList::JobEntry* m_job;
+    static const int FG_MAX_NUM_ARGS = 1;
 };
 
 class BackgroundCommand : public BuiltInCommand {
@@ -186,9 +215,12 @@ class KillCommand : public BuiltInCommand {
 class SmallShell {
 private:
     SmallShell();
-    stack<char**> m_lastPwdList;
+    stack<char*> m_lastPwdList;
     char* m_currPwd;
     std::string m_smashPrompt;
+    JobsList* jobs;
+
+    static Command* handleChdirCommand(stack<char*>* lastPwdList, char** currPwd, const char* cmd_line);
 
 public:
     Command *CreateCommand(const char* cmd_line);
@@ -207,6 +239,8 @@ public:
     const std::string& getPrompt() const;
     void setPrompt(const std::string& new_prompt);
     const char* getCurrDir() const;
+    JobsList* getJobsList() const;
+
   // TODO: add extra methods as needed
 };
 
