@@ -23,16 +23,18 @@ public:
 class JobNotFoundError: public exception {
 public:
     explicit JobNotFoundError(int jobId):
-        jobId(jobId)
+            m_errorStr("smash error: fg: job-id " + std::to_string(jobId) + " does not exist")
+//        jobId(jobId)
     {}
 
     const char* what() const noexcept override {
         // TODO: fix this error message
-        return "smash error: fg: job-id <job-id> does not exist";
+        return m_errorStr.c_str();
+//        return "smash error: fg: job-id <job-id> does not exist";
     }
 
 private:
-    int jobId;
+    std::string m_errorStr;
 };
 
 class JobsListIsEmptyError: public exception {
@@ -47,6 +49,66 @@ public:
     const char* what() const noexcept override {
         return "smash error: fg: invalid arguments";
     }
+};
+
+class BgInvalidArgumentsError: public  exception {
+    const char* what() const noexcept override {
+        return "smash error: bg: invalid arguments";
+    }
+};
+
+class BgJobNotFoundError : public exception {
+public:
+    explicit BgJobNotFoundError(int jobId):
+        m_errorStr("smash error: bg: job-id " + std::to_string(jobId) + " does not exist")
+    {}
+
+    const char* what() const noexcept override {
+        return m_errorStr.c_str();
+    }
+private:
+    std::string m_errorStr;
+};
+
+class BgJobNotStoppedError : public exception {
+public:
+    explicit BgJobNotStoppedError(int jobId):
+        m_errorStr("smash error: bg: job-id " + std::to_string(jobId) + " is already running in the background")
+    {}
+
+    const char* what() const noexcept override {
+        return m_errorStr.c_str();
+    }
+private:
+    std::string m_errorStr;
+};
+
+class BgNoStoppedJobs : public  exception {
+    const char* what() const noexcept override {
+        return "smash error: bg: there is no stopped jobs to resume";
+    }
+};
+
+class NoStoppedJobs {};
+
+class KillInvalidArgumentsError : public exception {
+    const char* what() const noexcept override {
+        return "smash error: kill: invalid arguments";
+    }
+};
+
+class KillJobNotFoundError : public exception {
+public:
+    explicit KillJobNotFoundError(int jobId) :
+        m_errorStr("smash error: kill: job-id " + std::to_string(jobId) + " does not exist")
+    {}
+
+    const char* what() const noexcept override {
+        return m_errorStr.c_str();
+    }
+
+private:
+    std::string m_errorStr;
 };
 
 // SyscallException

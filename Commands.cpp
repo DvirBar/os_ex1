@@ -128,24 +128,32 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
   string cmd_s = _trim(string(cmd_line));
   string commandStr = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
 
-  if (commandStr.compare("pwd") == 0) {
+  if (commandStr == "pwd") {
     return new GetCurrDirCommand(cmd_line);
   }
 
-  else if (commandStr.compare("showpid") == 0) {
+  else if (commandStr == "showpid") {
     return new ShowPidCommand(cmd_line);
   }
 
-  else if(commandStr.compare("chprompt") == 0) {
+  else if(commandStr == "chprompt") {
       return new ChangePromptCommand(cmd_line);
   }
 
-  else if(commandStr.compare("cd")) {
+  else if(commandStr == "cd") {
       return SmallShell::handleChdirCommand(&m_lastPwdList, &m_currPwd, cmd_line);
   }
 
-  else if(commandStr.compare(("fg"))) {
+  else if(commandStr == "fg") {
       return new ForegroundCommand(cmd_line, getJobsList());
+  }
+
+  else if(commandStr == "jobs") {
+      return new JobsCommand(cmd_line, getJobsList());
+  }
+
+  else if(commandStr == "bg") {
+      return new BackgroundCommand(cmd_line, getJobsList());
   }
 
  return new ExternalCommand(cmd_line);
@@ -252,6 +260,14 @@ void ChangeDirCommand::execute() {
     }
 }
 
+JobsCommand::JobsCommand(const char *cmd_line, JobsList *jobs) :
+    BuiltInCommand(cmd_line)
+{ }
+
+void JobsCommand::execute() {
+    SmallShell::getInstance().getJobsList()->printJobsList();
+}
+
 ForegroundCommand::ForegroundCommand(const char *cmd_line, JobsList *jobs):
         BuiltInCommand(cmd_line)
 {
@@ -267,9 +283,10 @@ ForegroundCommand::ForegroundCommand(const char *cmd_line, JobsList *jobs):
 }
 
 void ForegroundCommand::execute() {
-    m_job->print();
+    m_job->printCmdLine();
 
     if(m_job->isJobStopped()) {
+        m_job->continueJob();
         kill(m_job->getPid(), SIGCONT);
     }
 
@@ -277,10 +294,87 @@ void ForegroundCommand::execute() {
     waitpid(m_job->getPid(), &status, 0);
 }
 
-// JOBS
+BackgroundCommand::BackgroundCommand(const char *cmd_line, JobsList *jobs) :
+        BuiltInCommand(cmd_line)
+{
+    int requestedJobID = 0;
+    try {
+        if(m_numArgs == 1) {
+            m_bgJob = jobs->getLastStoppedJob();
+        }
+        else if (m_numArgs == 2) {
+            requestedJobID = stoi(m_args[1]);
+            m_bgJob = jobs->getJobById(requestedJobID);
+            if (!m_bgJob->isJobStopped())
+                throw BgJobNotStoppedError(requestedJobID);
+        }
+        else
+            throw BgInvalidArgumentsError();
+    }
+
+    catch (invalid_argument& invalidArgument) {
+        throw BgInvalidArgumentsError();
+    }
+
+    catch (JobNotFoundError& jobNotFoundError) {
+        throw BgJobNotFoundError(requestedJobID);
+    }
+
+    catch (NoStoppedJobs& noStoppedJobs) {
+        throw BgNoStoppedJobs();
+    }
+}
+
+
+void BackgroundCommand::execute() {
+    m_bgJob->printCmdLine();
+    m_bgJob->continueJob();
+    kill(m_bgJob->getPid(), SIGCONT);
+}
+
+KillCommand::KillCommand(const char *cmd_line, JobsList *jobs):
+    BuiltInCommand(cmd_line)
+{
+    int requestedJobID;
+    try {
+        int requestedSig;
+        if(m_numArgs != 3)
+            throw KillInvalidArgumentsError();
+
+        if(m_args[1][0] != '-')
+            throw KillInvalidArgumentsError();
+
+        std::string sigStr = m_args[1];
+        requestedSig = stoi(sigStr.substr(1));
+        requestedJobID = stoi(m_args[2]);
+
+        m_killJob = jobs->getJobById(requestedJobID);
+        m_sig = requestedSig;
+    }
+
+    catch (invalid_argument& invalidArgument) {
+        throw KillInvalidArgumentsError();
+    }
+
+    catch (JobNotFoundError& jobNotFoundError) {
+        throw KillJobNotFoundError(requestedJobID);
+    }
+}
+
+void KillCommand::execute() {
+    int pid = m_killJob->getPid();
+    kill(pid, m_sig);
+    cout << "signal number " << m_sig << " was sent to pid " << pid << endl;
+}
+
+
+
+
+
+/* --------------------------------------------------- JOBS LIST ---------------------------------------------------- */
 void JobsList::addJob(Command *cmd, bool isStopped) {
     int jobId = assignJobId(jobs);
-    auto jobEntry = new JobEntry(jobId, cmd, isStopped);
+    auto jobEntry = new JobEntry(jobId, 0, cmd, isStopped);
     jobs.insert({jobId, jobEntry});
 }
 
@@ -304,13 +398,20 @@ JobsList::JobEntry* JobsList::getJobById(int jobId) {
     return jobIterator->second;
 }
 
-JobsList::JobEntry::JobEntry(int jobId, Command *cmd, bool isStopped):
+JobsList::JobEntry::JobEntry(int jobId, int jobPid, Command *cmd, bool isStopped) :
     m_jobId(jobId),
+    m_pid(jobPid),
     m_cmd(cmd),
     m_isStopped(isStopped),
     m_insertTime(time(nullptr))
-{
-    // TODO: how to get job pid?
+{ }
+
+bool JobsList::JobEntry::isJobStopped() const {
+    return m_isStopped;
+}
+
+int JobsList::JobEntry::getPid() const {
+    return m_pid;
 }
 
 void JobsList::JobEntry::print(bool includeTime) const {
@@ -332,10 +433,52 @@ void JobsList::JobEntry::print(bool includeTime) const {
     << timeStr << " secs"<< stoppedFlag << endl;
 }
 
+void JobsList::JobEntry::printCmdLine() const {
+    cout << m_cmd->getCmdLine() << " : " << m_pid << endl;
+}
+
+void JobsList::JobEntry::continueJob() {
+    m_isStopped = false;
+}
+
+void JobsList::JobEntry::stopJob() {
+    m_isStopped = true;
+}
+
 int JobsList::getMaxJobId() const {
     if(jobs.empty()) {
         throw JobsListIsEmptyError();
     }
 
     return jobs.rbegin()->first;
+}
+
+void JobsList::removeFinishedJobs() {
+    int status;
+    for (auto job: jobs) {
+        if(waitpid(job.second->getPid(), &status, WNOHANG)) {
+            removeJobById(job.first);
+        }
+    }
+}
+
+void JobsList::printJobsList() {
+    removeFinishedJobs();
+    for(auto job: jobs){
+        job.second->print();
+    }
+}
+
+JobsList::JobEntry*  JobsList::getLastStoppedJob() {
+    JobEntry* jobEntry = jobs.begin()->second;
+    for(auto job: jobs) {
+        if(job.second->isJobStopped())
+            jobEntry = job.second;
+    }
+    if(!jobEntry->isJobStopped()) {
+        throw NoStoppedJobs();
+    }
+
+    return  jobEntry;
+
 }

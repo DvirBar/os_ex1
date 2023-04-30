@@ -110,10 +110,13 @@ class JobsList {
  public:
   class JobEntry {
   public:
-      JobEntry(int jobId, Command* cmd, bool isStopped);
+      JobEntry(int jobId, int jobPid, Command *cmd, bool isStopped);
       bool isJobStopped() const;
       pid_t getPid() const;
       void print(bool includeTime = true) const;
+      void printCmdLine() const;
+      void continueJob();
+      void stopJob();
 
   private:
       int m_jobId;
@@ -135,9 +138,9 @@ class JobsList {
   JobEntry * getJobById(int jobId);
   void removeJobById(int jobId);
   JobEntry * getLastJob(int* lastJobId);
-  JobEntry *getLastStoppedJob(int *jobId);
+  JobEntry *getLastStoppedJob();
   int getMaxJobId() const;
-  JobEntry* getJobById(char* jobId) const;
+//  JobEntry* getJobById(char* jobId) const;
   // TODO: Add extra methods or modify exisitng ones as needed
 
 private:
@@ -149,7 +152,7 @@ class JobsCommand : public BuiltInCommand {
  // TODO: Add your data members
  public:
   JobsCommand(const char* cmd_line, JobsList* jobs);
-  virtual ~JobsCommand() {}
+  ~JobsCommand() override = default;
   void execute() override;
 };
 
@@ -165,10 +168,15 @@ private:
 
 class BackgroundCommand : public BuiltInCommand {
  // TODO: Add your data members
- public:
-  BackgroundCommand(const char* cmd_line, JobsList* jobs);
-  virtual ~BackgroundCommand() {}
-  void execute() override;
+public:
+    BackgroundCommand(const char* cmd_line, JobsList* jobs);
+    virtual ~BackgroundCommand() {}
+    void execute() override;
+private:
+    JobsList::JobEntry* m_bgJob;
+    static const int BG_MAX_NUM_ARGS = 1;
+
+
 };
 
 class TimeoutCommand : public BuiltInCommand {
@@ -205,11 +213,13 @@ class SetcoreCommand : public BuiltInCommand {
 };
 
 class KillCommand : public BuiltInCommand {
- // TODO: Add your data members
  public:
-  KillCommand(const char* cmd_line, JobsList* jobs);
-  virtual ~KillCommand() {}
-  void execute() override;
+    KillCommand(const char* cmd_line, JobsList* jobs);
+    virtual ~KillCommand() {}
+    void execute() override;
+private:
+    JobsList::JobEntry* m_killJob;
+    int m_sig;
 };
 
 class SmallShell {
