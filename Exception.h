@@ -112,14 +112,27 @@ private:
 };
 
 // SyscallException
-class SyscallException: public exception {};
-
-class SyscallChdirError: public SyscallException {
+class SyscallException: public exception {
 public:
+    explicit SyscallException(const char* syscallName) :
+        m_syscallName(syscallName),
+        m_errorStr("smash error: " + m_syscallName + " failed")
+    {}
     const char* what() const noexcept override {
-        return "smash error: cd: chdir failed";
+        return m_errorStr.c_str();
     }
+private:
+    std::string m_syscallName;
+    std::string m_errorStr;
 };
+
+//class SyscallChdirError: public SyscallException {
+//public:
+//    const char* what() const noexcept override {
+//        return "smash error: cd: chdir failed";
+//    }
+//};
+//
 
 
 

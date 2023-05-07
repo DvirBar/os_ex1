@@ -88,6 +88,9 @@ void _removeBackgroundSign(char* cmd_line) {
 
 SmallShell::SmallShell() {
     m_currPwd = getcwd(nullptr, 0);
+    if(m_currPwd == nullptr) {
+        throw SyscallException("getcwd");
+    }
     m_smashPrompt = "smash> ";
 }
 
@@ -256,7 +259,7 @@ ChangeDirCommand::ChangeDirCommand(const char *cmd_line, char **plastPwd):
 void ChangeDirCommand::execute() {
     int retValue = chdir(m_lastPwd);
     if(retValue == RET_VALUE_ERROR) {
-        throw SyscallChdirError();
+        throw SyscallException("chdir");
     }
 }
 
@@ -287,11 +290,15 @@ void ForegroundCommand::execute() {
 
     if(m_job->isJobStopped()) {
         m_job->continueJob();
-        kill(m_job->getPid(), SIGCONT);
+        if(kill(m_job->getPid(), SIGCONT) == RET_VALUE_ERROR) {
+            throw SyscallException("kill");
+        }
     }
 
     int status;
-    waitpid(m_job->getPid(), &status, 0);
+    if(waitpid(m_job->getPid(), &status, 0) == RET_VALUE_ERROR) {
+        throw SyscallException("waitpid");
+    }
 }
 
 BackgroundCommand::BackgroundCommand(const char *cmd_line, JobsList *jobs) :
@@ -299,10 +306,10 @@ BackgroundCommand::BackgroundCommand(const char *cmd_line, JobsList *jobs) :
 {
     int requestedJobID = 0;
     try {
-        if(m_numArgs == 1) {
+        if(m_numArgs == Command::NO_ARGS) {
             m_bgJob = jobs->getLastStoppedJob();
         }
-        else if (m_numArgs == 2) {
+        else if (m_numArgs == BG_MAX_NUM_ARGS) {
             requestedJobID = stoi(m_args[1]);
             m_bgJob = jobs->getJobById(requestedJobID);
             if (!m_bgJob->isJobStopped())
@@ -329,7 +336,9 @@ BackgroundCommand::BackgroundCommand(const char *cmd_line, JobsList *jobs) :
 void BackgroundCommand::execute() {
     m_bgJob->printCmdLine();
     m_bgJob->continueJob();
-    kill(m_bgJob->getPid(), SIGCONT);
+    if(kill(m_bgJob->getPid(), SIGCONT) == RET_VALUE_ERROR) {
+        throw SyscallException("kill");
+    }
 }
 
 KillCommand::KillCommand(const char *cmd_line, JobsList *jobs):
@@ -338,10 +347,10 @@ KillCommand::KillCommand(const char *cmd_line, JobsList *jobs):
     int requestedJobID;
     try {
         int requestedSig;
-        if(m_numArgs != 3)
+        if(m_numArgs != KILL_NUM_ARGS)
             throw KillInvalidArgumentsError();
 
-        if(m_args[1][0] != '-')
+        if(m_args[1][0] != KILL_SIGNAL_PREFIX)
             throw KillInvalidArgumentsError();
 
         std::string sigStr = m_args[1];
@@ -363,7 +372,13 @@ KillCommand::KillCommand(const char *cmd_line, JobsList *jobs):
 
 void KillCommand::execute() {
     int pid = m_killJob->getPid();
-    kill(pid, m_sig);
+    if(m_sig == SIGSTOP) {
+        m_killJob->stopJob();
+    }
+
+    if(kill(pid, m_sig) == RET_VALUE_ERROR) {
+        throw SyscallException("kill");
+    }
     cout << "signal number " << m_sig << " was sent to pid " << pid << endl;
 }
 
@@ -455,9 +470,16 @@ int JobsList::getMaxJobId() const {
 
 void JobsList::removeFinishedJobs() {
     int status;
+    int waitpidCheck;
     for (auto job: jobs) {
-        if(waitpid(job.second->getPid(), &status, WNOHANG)) {
+        waitpidCheck = waitpid(job.second->getPid(), &status, WNOHANG);
+
+        if(waitpidCheck > 0) {
             removeJobById(job.first);
+        }
+
+        else if(waitpidCheck == RET_VALUE_ERROR) {
+            throw SyscallException("waitpid");
         }
     }
 }
