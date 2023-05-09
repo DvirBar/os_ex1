@@ -4,7 +4,6 @@
 #include <vector>
 #include <map>
 #include <list>
-#include <stack>
 #include <time.h>
 
 #define COMMAND_ARGS_MAX_LENGTH (200)
@@ -22,6 +21,8 @@ public:
   //virtual void cleanup();
   const char* getCmdLine() const;
 
+  static const int MAX_COMMAND_SIZE = 80;
+
 protected:
     const char* m_cmdLine;
     char** m_args;
@@ -29,6 +30,7 @@ protected:
 
     static const int NO_ARGS = 1;
     static const int CMD_MAX_NUM_ARGS = 20;
+
 };
 
 class BuiltInCommand: public Command {
@@ -74,13 +76,13 @@ private:
 class ChangeDirCommand: public BuiltInCommand {
 // TODO: Add your data members
 public:
-    ChangeDirCommand(const char* cmd_line, char** plastPwd);
+    ChangeDirCommand(const char *cmd_line, string* plastPwd, string* currPwd);
     virtual ~ChangeDirCommand() {}
     void execute() override;
 
 private:
     static const int MAX_ARGS = 1;
-    char* m_lastPwd;
+    string m_targetPwd;
 };
 
 class GetCurrDirCommand: public BuiltInCommand {
@@ -99,11 +101,14 @@ class ShowPidCommand: public BuiltInCommand {
 
 class JobsList;
 class QuitCommand : public BuiltInCommand {
-// TODO: Add your data members
 public:
   QuitCommand(const char* cmd_line, JobsList* jobs);
   virtual ~QuitCommand() {}
   void execute() override;
+
+private:
+    bool execKill;
+    JobsList* m_jobs;
 };
 
 class JobsList {
@@ -113,7 +118,7 @@ class JobsList {
       JobEntry(int jobId, int jobPid, Command *cmd, bool isStopped);
       bool isJobStopped() const;
       pid_t getPid() const;
-      void print(bool includeTime = true) const;
+      void print(bool showStoppedFlag, bool includeTime = true) const;
       void printCmdLine() const;
       void continueJob();
       void stopJob();
@@ -128,23 +133,24 @@ class JobsList {
       // TODO: pointer to last stopped job?
   };
  public:
-    // TODO: Delete job entries
+    JobsList() = default;
   ~JobsList();
   void addJob(Command* cmd, bool isStopped = false);
   void printJobsList();
   void killAllJobs();
-  // TODO: remember to delete* jobs!
   void removeFinishedJobs();
   JobEntry * getJobById(int jobId);
   void removeJobById(int jobId);
   JobEntry * getLastJob(int* lastJobId);
   JobEntry *getLastStoppedJob();
   int getMaxJobId() const;
+  bool isEmpty() const;
 //  JobEntry* getJobById(char* jobId) const;
   // TODO: Add extra methods or modify exisitng ones as needed
 
 private:
     static int assignJobId(map<int, JobEntry*> jobs);
+
     map<int, JobEntry*> jobs;
 };
 
@@ -227,12 +233,10 @@ private:
 class SmallShell {
 private:
     SmallShell();
-    stack<char*> m_lastPwdList;
-    char* m_currPwd;
     std::string m_smashPrompt;
     JobsList* jobs;
-
-    static Command* handleChdirCommand(stack<char*>* lastPwdList, char** currPwd, const char* cmd_line);
+    string m_lastPwd;
+    string m_currPwd;
 
 public:
     Command *CreateCommand(const char* cmd_line);
@@ -250,7 +254,10 @@ public:
     void executeCommand(const char* cmd_line);
     const std::string& getPrompt() const;
     void setPrompt(const std::string& new_prompt);
-    const char* getCurrDir() const;
+    string getCurrDir() const;
+    string getLastDir() const;
+    void setCurrDir(char* dir);
+    void setLastDir(char* dir);
     JobsList* getJobsList() const;
 
   // TODO: add extra methods as needed

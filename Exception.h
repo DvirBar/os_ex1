@@ -20,9 +20,11 @@ public:
     }
 };
 
-class JobNotFoundError: public exception {
+class JobNotFoundError: public exception {};
+
+class FgJobNotFoundError: public exception {
 public:
-    explicit JobNotFoundError(int jobId):
+    explicit FgJobNotFoundError(int jobId):
             m_errorStr("smash error: fg: job-id " + std::to_string(jobId) + " does not exist")
 //        jobId(jobId)
     {}

@@ -84,22 +84,25 @@ void _removeBackgroundSign(char* cmd_line) {
   cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
 }
 
-// TODO: Add your implementation for classes in Commands.h 
-
 SmallShell::SmallShell() {
     m_currPwd = getcwd(nullptr, 0);
-    if(m_currPwd == nullptr) {
+    jobs = new JobsList;
+    if(m_currPwd == string("")) {
         throw SyscallException("getcwd");
     }
     m_smashPrompt = "smash> ";
 }
 
 SmallShell::~SmallShell() {
-// TODO: add your implementation
+    delete jobs;
 }
 
-const char *SmallShell::getCurrDir() const {
+string SmallShell::getCurrDir() const {
     return m_currPwd;
+}
+
+string SmallShell::getLastDir() const {
+    return m_lastPwd;
 }
 
 const std::string& SmallShell::getPrompt() const {
@@ -118,6 +121,12 @@ Command::Command(const char *cmd_line):
 
     this->m_args = args;
     this->m_numArgs = numArgs;
+}
+
+Command::~Command() {
+    for(int i=0; i<m_numArgs; i++) {
+        ::free(m_args[i]);
+    }
 }
 
 BuiltInCommand::BuiltInCommand(const char *cmd_line):
@@ -144,7 +153,11 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
   }
 
   else if(commandStr == "cd") {
-      return SmallShell::handleChdirCommand(&m_lastPwdList, &m_currPwd, cmd_line);
+      auto lastPwd = getInstance().getLastDir();
+      auto currPwd = getInstance().getCurrDir();
+      auto cdCom = new ChangeDirCommand(cmd_line, &lastPwd, &currPwd);
+
+      return cdCom;
   }
 
   else if(commandStr == "fg") {
@@ -159,35 +172,20 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
       return new BackgroundCommand(cmd_line, getJobsList());
   }
 
+  else if(commandStr == "quit") {
+      return new QuitCommand(cmd_line, getJobsList());
+  }
+
+  else if(commandStr == "kill") {
+      return new KillCommand(cmd_line, getJobsList());
+  }
+
  return new ExternalCommand(cmd_line);
 
 }
 
-Command* SmallShell::handleChdirCommand(stack<char *> *lastPwdList, char **currPwd, const char *cmd_line) {
-    char** plastPwd = nullptr;
-    char* lastPwdCopy = nullptr;
-
-    if(!lastPwdList->empty()) {
-        plastPwd = &(lastPwdList->top());
-        lastPwdCopy = lastPwdList->top();
-    }
-
-    auto cdCom = new ChangeDirCommand(cmd_line, plastPwd);
-
-    // If plastPwd wasn't changed, it means that we used "-" argument
-    if(*plastPwd == lastPwdCopy) {
-        lastPwdList->pop();
-    } else {
-        lastPwdList->push(*plastPwd);
-        *(currPwd) = *plastPwd;
-    }
-
-    return cdCom;
-}
-
 void SmallShell::executeCommand(const char *cmd_line) {
-    // TODO: Manage job list
-
+    jobs->removeFinishedJobs();
     Command* cmd = CreateCommand(cmd_line);
 
     try {
@@ -199,6 +197,8 @@ void SmallShell::executeCommand(const char *cmd_line) {
         cerr << error.what() << endl;
     }
     // Please note that you must fork smash process for some commands (e.g., external commands....)
+
+    delete cmd;
 }
 
 
@@ -236,28 +236,32 @@ void GetCurrDirCommand::execute() {
 }
 
 
-ChangeDirCommand::ChangeDirCommand(const char *cmd_line, char **plastPwd):
+ChangeDirCommand::ChangeDirCommand(const char *cmd_line, string* plastPwd, string* currPwd):
         BuiltInCommand(cmd_line)
 {
     if(m_numArgs > MAX_ARGS) {
         throw TooManyArgsError();
     }
 
-    // TODO: check for invalid literals
     // TODO: check for the same path
     // TODO: more exceptions?
-
     char* arg = m_args[1];
-    if(arg == string("-") && plastPwd == nullptr) {
-        throw NoPWDError();
+
+    if(arg == string("-")) {
+        if (plastPwd == nullptr) {
+            throw NoPWDError();
+        }
+        m_targetPwd = *plastPwd;
+    } else {
+        m_targetPwd = arg;
     }
 
-    m_lastPwd = arg;
-    *plastPwd = arg;
+    plastPwd = currPwd;
+    *currPwd = m_targetPwd;
 }
 
 void ChangeDirCommand::execute() {
-    int retValue = chdir(m_lastPwd);
+    int retValue = chdir(m_targetPwd.c_str());
     if(retValue == RET_VALUE_ERROR) {
         throw SyscallException("chdir");
     }
@@ -274,15 +278,30 @@ void JobsCommand::execute() {
 ForegroundCommand::ForegroundCommand(const char *cmd_line, JobsList *jobs):
         BuiltInCommand(cmd_line)
 {
-    int jobId = stoi(m_args[1]);
+    int jobId;
+    try {
+        if(m_numArgs == Command::NO_ARGS) {
+            if(jobs->isEmpty()) {
+                throw JobsListIsEmptyError();
+            }
 
-    if(m_numArgs == Command::NO_ARGS) {
-        jobId = jobs->getMaxJobId();
-    } else if(m_numArgs > ForegroundCommand::FG_MAX_NUM_ARGS) {
+            jobId = jobs->getMaxJobId();
+        } else if(m_numArgs > ForegroundCommand::FG_MAX_NUM_ARGS) {
+            throw FgInvalidArgumentsError();
+        } else {
+            jobId = stoi(m_args[1]);
+        }
+
+        m_job = jobs->getJobById(jobId);
+    }
+
+    catch(const invalid_argument& error) {
         throw FgInvalidArgumentsError();
     }
 
-    m_job = jobs->getJobById(jobId);
+    catch(const JobNotFoundError& error) {
+        throw FgJobNotFoundError(jobId);
+    }
 }
 
 void ForegroundCommand::execute() {
@@ -341,6 +360,25 @@ void BackgroundCommand::execute() {
     }
 }
 
+QuitCommand::QuitCommand(const char *cmd_line, JobsList *jobs):
+    BuiltInCommand(cmd_line),
+    execKill(false),
+    m_jobs(jobs)
+{
+    if(m_args[1] == string("kill")) {
+        execKill = true;
+    }
+}
+
+void QuitCommand::execute() {
+    if(execKill) {
+        cout << "sending SIGKILL signal to 3 jobs:" << endl;
+        m_jobs->killAllJobs();
+    }
+
+    ::exit(0);
+}
+
 KillCommand::KillCommand(const char *cmd_line, JobsList *jobs):
     BuiltInCommand(cmd_line)
 {
@@ -384,9 +422,13 @@ void KillCommand::execute() {
 
 
 
-
-
 /* --------------------------------------------------- JOBS LIST ---------------------------------------------------- */
+JobsList::~JobsList() {
+    for(auto job: jobs) {
+        delete job.second;
+    }
+}
+
 void JobsList::addJob(Command *cmd, bool isStopped) {
     int jobId = assignJobId(jobs);
     auto jobEntry = new JobEntry(jobId, 0, cmd, isStopped);
@@ -407,10 +449,14 @@ JobsList::JobEntry* JobsList::getJobById(int jobId) {
     auto jobIterator = jobs.find(jobId);
 
     if(jobIterator == jobs.end()) {
-        throw JobNotFoundError(jobId);
+        throw JobNotFoundError();
     }
 
     return jobIterator->second;
+}
+
+bool JobsList::isEmpty() const {
+    return jobs.empty();
 }
 
 JobsList::JobEntry::JobEntry(int jobId, int jobPid, Command *cmd, bool isStopped) :
@@ -429,23 +475,26 @@ int JobsList::JobEntry::getPid() const {
     return m_pid;
 }
 
-void JobsList::JobEntry::print(bool includeTime) const {
+/*
+ *  Print format:
+ *  [<jobId>] <cmd_line> : <jobPid> {optional: <time> secs} {<optional: (stopped)>}
+ * */
+void JobsList::JobEntry::print( bool showStoppedFlag, bool includeTime) const {
     double timeDiff;
     string timeStr;
     time_t currTime = time(nullptr);
 
     if(includeTime) {
         timeDiff = difftime(m_insertTime, currTime);
-        timeStr = to_string(timeDiff);
+        timeStr = " " + to_string(timeDiff) + " secs";
     }
 
     string stoppedFlag;
-    if(m_isStopped) {
+    if(m_isStopped && showStoppedFlag) {
         stoppedFlag = " (stopped)";
     }
 
-    cout << "[" << m_jobId << "] " << m_cmd->getCmdLine() << " : " << m_pid << " "
-    << timeStr << " secs"<< stoppedFlag << endl;
+    cout << "[" << m_jobId << "] " << m_cmd->getCmdLine() << " : " << m_pid << timeStr << stoppedFlag << endl;
 }
 
 void JobsList::JobEntry::printCmdLine() const {
@@ -487,7 +536,7 @@ void JobsList::removeFinishedJobs() {
 void JobsList::printJobsList() {
     removeFinishedJobs();
     for(auto job: jobs){
-        job.second->print();
+        job.second->print(true, true);
     }
 }
 
@@ -503,4 +552,12 @@ JobsList::JobEntry*  JobsList::getLastStoppedJob() {
 
     return  jobEntry;
 
+}
+
+void JobsList::killAllJobs() {
+    for(auto job: jobs) {
+        job.second->print(false, false);
+        kill(job.second->getPid(), SIGKILL);
+        removeJobById(job.first);
+    }
 }
