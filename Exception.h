@@ -54,6 +54,7 @@ public:
 };
 
 class BgInvalidArgumentsError: public  exception {
+public:
     const char* what() const noexcept override {
         return "smash error: bg: invalid arguments";
     }
@@ -86,6 +87,7 @@ private:
 };
 
 class BgNoStoppedJobs : public  exception {
+public:
     const char* what() const noexcept override {
         return "smash error: bg: there is no stopped jobs to resume";
     }
@@ -94,6 +96,7 @@ class BgNoStoppedJobs : public  exception {
 class NoStoppedJobs {};
 
 class KillInvalidArgumentsError : public exception {
+public:
     const char* what() const noexcept override {
         return "smash error: kill: invalid arguments";
     }
@@ -128,13 +131,33 @@ private:
     std::string m_errorStr;
 };
 
-//class SyscallChdirError: public SyscallException {
-//public:
-//    const char* what() const noexcept override {
-//        return "smash error: cd: chdir failed";
-//    }
-//};
-//
+class SetCoreJobNotFoundError: public exception {
+public:
+    explicit SetCoreJobNotFoundError(int jobid) :
+        m_errorStr("smash error: setcore: job-id " + to_string(jobid) + " does not exist")
+    {}
+    const char* what() const noexcept override {
+        return m_errorStr.c_str();
+    }
+
+private:
+    string m_errorStr;
+};
+
+class SetCoreInvalidCoreError: public exception {
+public:
+    const char* what() const noexcept override {
+        return "smash error: setcore: invalid core number";
+    }
+};
+
+class SetCoreInvalidArguments: public exception {
+public:
+    const char* what() const noexcept override {
+        return "smash error: setcore: invalid arguments";
+    }
+};
+
 
 
 

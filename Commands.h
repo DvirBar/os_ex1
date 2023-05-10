@@ -14,17 +14,17 @@ using namespace std;
 
 class Command {
 public:
-  explicit Command(const char* cmd_line);
-  virtual ~Command();
-  virtual void execute() = 0;
+    explicit Command(const char* cmd_line);
+    virtual ~Command();
+    virtual void execute() = 0;
   //virtual void prepare();
   //virtual void cleanup();
-  const char* getCmdLine() const;
+    const char* getCmdLine() const;
 
-  static const int MAX_COMMAND_SIZE = 80;
+    static const int MAX_COMMAND_SIZE = 80;
 
 protected:
-    static const int NO_ARGS = 1;
+    static const int NO_ARGS = 0;
     static const int CMD_MAX_NUM_ARGS = 20;
 
     const char* m_cmdLine;
@@ -35,9 +35,9 @@ protected:
 };
 
 class BuiltInCommand: public Command {
- public:
-  explicit BuiltInCommand(const char* cmd_line);
-  ~BuiltInCommand() override = default;
+public:
+    explicit BuiltInCommand(const char* cmd_line);
+    ~BuiltInCommand() override = default;
 };
 
 //class ExternalCommand: public Command {
@@ -71,7 +71,7 @@ public:
     ~ChangePromptCommand() override = default;
     void execute() override;
 private:
-    char* m_newPrompt;
+    string m_newPrompt;
 };
 
 class ChangeDirCommand: public BuiltInCommand {
@@ -87,25 +87,25 @@ private:
 };
 
 class GetCurrDirCommand: public BuiltInCommand {
- public:
-  explicit GetCurrDirCommand(const char* cmd_line);
-  ~GetCurrDirCommand() override = default;
-  void execute() override;
+public:
+    explicit GetCurrDirCommand(const char* cmd_line);
+    ~GetCurrDirCommand() override = default;
+    void execute() override;
 };
 
 class ShowPidCommand: public BuiltInCommand {
- public:
-  explicit ShowPidCommand(const char* cmd_line);
-  ~ShowPidCommand() override = default;
-  void execute() override;
+public:
+    explicit ShowPidCommand(const char* cmd_line);
+    ~ShowPidCommand() override = default;
+    void execute() override;
 };
 
 class JobsList;
 class QuitCommand : public BuiltInCommand {
 public:
-  QuitCommand(const char* cmd_line, JobsList* jobs);
-  ~QuitCommand() override = default;
-  void execute() override;
+    QuitCommand(const char* cmd_line, JobsList* jobs);
+    ~QuitCommand() override = default;
+    void execute() override;
 
 private:
     bool execKill;
@@ -113,61 +113,60 @@ private:
 };
 
 class JobsList {
- public:
-  class JobEntry {
-  public:
-      JobEntry(int jobId, int jobPid, Command *cmd, bool isStopped);
-      bool isJobStopped() const;
-      pid_t getPid() const;
-      void print(bool showStoppedFlag, bool includeTime = true) const;
-      void printCmdLine() const;
-      void continueJob();
-      void stopJob();
+public:
+    class JobEntry {
+    public:
+        JobEntry(int jobId, int jobPid, Command *cmd, bool isStopped);
+        bool isJobStopped() const;
+        pid_t getPid() const;
+        void print(bool showStoppedFlag, bool includeTime = true) const;
+        void printCmdLine() const;
+        void continueJob();
+        void stopJob();
 
-  private:
-      int m_jobId;
-      pid_t m_pid;
-      Command* m_cmd;
-      bool m_isStopped;
-      time_t m_insertTime;
+    private:
+        int m_jobId;
+        pid_t m_pid;
+        Command* m_cmd;
+        bool m_isStopped;
+        time_t m_insertTime;
 
       // TODO: pointer to last stopped job?
   };
  public:
     JobsList() = default;
-  ~JobsList();
-  void addJob(Command* cmd, bool isStopped = false);
-  void printJobsList();
-  void killAllJobs();
-  void removeFinishedJobs();
-  JobEntry * getJobById(int jobId);
-  void removeJobById(int jobId);
+    ~JobsList();
+    void addJob(Command* cmd, bool isStopped = false);
+    void printJobsList();
+    void killAllJobs();
+    void removeFinishedJobs();
+    JobEntry * getJobById(int jobId);
+    void removeJobById(int jobId);
 //  JobEntry * getLastJob(int* lastJobId);
-  JobEntry *getLastStoppedJob();
-  int getMaxJobId() const;
-  bool isEmpty() const;
+    JobEntry *getLastStoppedJob();
+    int getMaxJobId() const;
+    bool isEmpty() const;
 //  JobEntry* getJobById(char* jobId) const;
   // TODO: Add extra methods or modify exisitng ones as needed
 
 private:
     static int assignJobId(map<int, JobEntry*> jobs);
-
     map<int, JobEntry*> jobs;
 };
 
 class JobsCommand : public BuiltInCommand {
  // TODO: Add your data members
- public:
-  JobsCommand(const char* cmd_line, JobsList* jobs);
-  ~JobsCommand() override = default;
-  void execute() override;
+public:
+    JobsCommand(const char* cmd_line, JobsList* jobs);
+    ~JobsCommand() override = default;
+    void execute() override;
 };
 
 class ForegroundCommand : public BuiltInCommand {
- public:
-  ForegroundCommand(const char* cmd_line, JobsList* jobs);
-  ~ForegroundCommand() override = default;
-  void execute() override;
+public:
+    ForegroundCommand(const char* cmd_line, JobsList* jobs);
+    ~ForegroundCommand() override = default;
+    void execute() override;
 private:
     JobsList::JobEntry* m_job;
     static const int FG_MAX_NUM_ARGS = 1;
@@ -182,8 +181,6 @@ public:
 private:
     JobsList::JobEntry* m_bgJob;
     static const int BG_MAX_NUM_ARGS = 2;
-
-
 };
 
 //class TimeoutCommand : public BuiltInCommand {
@@ -211,16 +208,19 @@ private:
 //  void execute() override;
 //};
 
-//class SetcoreCommand : public BuiltInCommand {
-//  // TODO: Add your data members
-// public:
-//  SetcoreCommand(const char* cmd_line);
-//  virtual ~SetcoreCommand() {}
-//  void execute() override;
-//};
+class SetcoreCommand : public BuiltInCommand {
+  // TODO: Add your data members
+public:
+    SetcoreCommand(const char* cmd_line, JobsList* jobs);
+    ~SetcoreCommand() override = default;
+    void execute() override;
+private:
+    JobsList::JobEntry* m_setCoreJob;
+    int m_core;
+};
 
 class KillCommand : public BuiltInCommand {
- public:
+public:
     KillCommand(const char* cmd_line, JobsList* jobs);
     ~KillCommand() override = default;
     void execute() override;

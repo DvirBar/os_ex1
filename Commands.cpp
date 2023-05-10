@@ -4,6 +4,8 @@
 #include <vector>
 #include <sstream>
 #include <sys/wait.h>
+#include <sys/sysinfo.h>
+#include <sched.h>
 #include <iomanip>
 #include <exception>
 #include <signal.h>
@@ -27,6 +29,8 @@ const std::string WHITESPACE = " \n\r\t\f\v";
 #define FUNC_ENTRY()
 #define FUNC_EXIT()
 #endif
+
+/* --------------------------------------------------- String Commands ---------------------------------------------------- */
 
 string _ltrim(const std::string& s)
 {
@@ -84,7 +88,7 @@ void _removeBackgroundSign(char* cmd_line) {
   // truncate the command line string up to the last non-space character
   cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
 }
-
+/* ------------------------------------------ Command Smash and Built in ------------------------------------------- */
 SmallShell::SmallShell() {
     m_currPwd = getcwd(nullptr, 0);
     jobs = new JobsList;
@@ -233,8 +237,11 @@ ChangePromptCommand::ChangePromptCommand(const char* cmd_line) :
         char cStringnewPropmpt[] = "smash> ";
         m_newPrompt = cStringnewPropmpt;
     }
-    else
+    else {
         m_newPrompt = m_args[1];
+        m_newPrompt = m_newPrompt + "> ";
+    }
+
 }
 
 void ChangePromptCommand::execute() {
@@ -433,6 +440,45 @@ void KillCommand::execute() {
         throw SyscallException("kill");
     }
     cout << "signal number " << m_sig << " was sent to pid " << pid << endl;
+}
+
+/* ----------------------------------------------- Special Commands ------------------------------------------------- */
+
+SetcoreCommand::SetcoreCommand(const char *cmd_line, JobsList* jobs) :
+    BuiltInCommand(cmd_line)
+{
+    int requestedJobId = 0;
+    int requestedCore = 0;
+
+    try {
+        if(m_numArgs == Command::NO_ARGS) {
+            throw SetCoreInvalidArguments();
+        }
+        requestedJobId = stoi(m_args[1]);
+        requestedCore = stoi(m_args[2]);
+        m_setCoreJob = jobs->getJobById(requestedJobId);
+        if(requestedCore >= get_nprocs() || requestedCore < 0) {
+            throw SetCoreInvalidCoreError();
+        }
+        m_core = requestedCore;
+    }
+
+    catch (invalid_argument& invalidArgument) {
+        throw SetCoreInvalidArguments();
+    }
+
+    catch (JobNotFoundError& jobNotFoundError) {
+        throw SetCoreJobNotFoundError(requestedJobId);
+    }
+}
+
+void SetcoreCommand::execute() {
+    cpu_set_t jobCPUMask;
+    CPU_ZERO(&jobCPUMask);
+    CPU_SET(m_core, &jobCPUMask);
+    if(sched_setaffinity(m_setCoreJob->getPid(), sizeof(jobCPUMask), &jobCPUMask) == RET_VALUE_ERROR) {
+        throw SyscallException("sched_setaffinity");
+    }
 }
 
 
