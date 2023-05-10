@@ -71,9 +71,10 @@ void _removeBackgroundSign(char* cmd_line) {
   // find last character other than spaces
   unsigned int idx = str.find_last_not_of(WHITESPACE);
   // if all characters are spaces then return
-  if (idx == string::npos) {
-    return;
-  }
+  // TODO: Uncomment
+//  if (idx == string::npos) {
+//    return;
+//  }
   // if the command line does not end with & then return
   if (cmd_line[idx] != '&') {
     return;
@@ -105,6 +106,18 @@ string SmallShell::getLastDir() const {
     return m_lastPwd;
 }
 
+void SmallShell::setCurrDir(const string& dir) {
+    m_currPwd = dir;
+}
+
+void SmallShell::setLastDir(const string &dir) {
+    m_lastPwd = dir;
+}
+
+JobsList *SmallShell::getJobsList() const {
+    return jobs;
+}
+
 const std::string& SmallShell::getPrompt() const {
     return m_smashPrompt;
 }
@@ -116,10 +129,7 @@ void SmallShell::setPrompt(const std::string &new_prompt) {
 Command::Command(const char *cmd_line):
     m_cmdLine(cmd_line)
 {
-    char* args[Command::CMD_MAX_NUM_ARGS+1];
-    int numArgs = _parseCommandLine(cmd_line, args)-1;
-
-    this->m_args = args;
+    int numArgs = _parseCommandLine(cmd_line, m_args)-1;
     this->m_numArgs = numArgs;
 }
 
@@ -127,6 +137,10 @@ Command::~Command() {
     for(int i=0; i<m_numArgs; i++) {
         ::free(m_args[i]);
     }
+}
+
+const char *Command::getCmdLine() const {
+    return m_cmdLine;
 }
 
 BuiltInCommand::BuiltInCommand(const char *cmd_line):
@@ -156,7 +170,8 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
       auto lastPwd = getInstance().getLastDir();
       auto currPwd = getInstance().getCurrDir();
       auto cdCom = new ChangeDirCommand(cmd_line, &lastPwd, &currPwd);
-
+      setLastDir(lastPwd);
+      setCurrDir(currPwd);
       return cdCom;
   }
 
@@ -176,11 +191,11 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
       return new QuitCommand(cmd_line, getJobsList());
   }
 
-  else if(commandStr == "kill") {
+//  else if(commandStr == "kill") {
       return new KillCommand(cmd_line, getJobsList());
-  }
+//  }
 
- return new ExternalCommand(cmd_line);
+// return new ExternalCommand(cmd_line);
 
 }
 
@@ -214,7 +229,7 @@ void ShowPidCommand::execute() {
 ChangePromptCommand::ChangePromptCommand(const char* cmd_line) :
         BuiltInCommand(cmd_line)
 {
-    if(m_numArgs == 1) {
+    if(m_numArgs == 0) {
         char cStringnewPropmpt[] = "smash> ";
         m_newPrompt = cStringnewPropmpt;
     }
@@ -278,7 +293,7 @@ void JobsCommand::execute() {
 ForegroundCommand::ForegroundCommand(const char *cmd_line, JobsList *jobs):
         BuiltInCommand(cmd_line)
 {
-    int jobId;
+    int jobId = 0;
     try {
         if(m_numArgs == Command::NO_ARGS) {
             if(jobs->isEmpty()) {
@@ -382,7 +397,7 @@ void QuitCommand::execute() {
 KillCommand::KillCommand(const char *cmd_line, JobsList *jobs):
     BuiltInCommand(cmd_line)
 {
-    int requestedJobID;
+    int requestedJobID = 0;
     try {
         int requestedSig;
         if(m_numArgs != KILL_NUM_ARGS)

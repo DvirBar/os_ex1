@@ -24,45 +24,46 @@ public:
   static const int MAX_COMMAND_SIZE = 80;
 
 protected:
-    const char* m_cmdLine;
-    char** m_args;
-    int m_numArgs;
-
     static const int NO_ARGS = 1;
     static const int CMD_MAX_NUM_ARGS = 20;
+
+    const char* m_cmdLine;
+    char* m_args[CMD_MAX_NUM_ARGS+1];
+    int m_numArgs;
+
 
 };
 
 class BuiltInCommand: public Command {
  public:
   explicit BuiltInCommand(const char* cmd_line);
-  virtual ~BuiltInCommand() {}
+  ~BuiltInCommand() override = default;
 };
 
-class ExternalCommand: public Command {
- public:
-  explicit ExternalCommand(const char* cmd_line);
-  virtual ~ExternalCommand() {}
-  void execute() override;
-};
+//class ExternalCommand: public Command {
+// public:
+//  explicit ExternalCommand(const char* cmd_line);
+//  virtual ~ExternalCommand() = default;
+//  void execute() override;
+//};
 
-class PipeCommand : public Command {
-  // TODO: Add your data members
- public:
-  explicit PipeCommand(const char* cmd_line);
-  virtual ~PipeCommand() {}
-  void execute() override;
-};
+//class PipeCommand : public Command {
+//  // TODO: Add your data members
+// public:
+//  explicit PipeCommand(const char* cmd_line);
+//  virtual ~PipeCommand() {}
+//  void execute() override;
+//};
 
-class RedirectionCommand: public Command {
- // TODO: Add your data members
- public:
-  explicit RedirectionCommand(const char* cmd_line);
-  virtual ~RedirectionCommand() {}
-  void execute() override;
-  //void prepare() override;
-  //void cleanup() override;
-};
+//class RedirectionCommand: public Command {
+// // TODO: Add your data members
+// public:
+//  explicit RedirectionCommand(const char* cmd_line);
+//  virtual ~RedirectionCommand() {}
+//  void execute() override;
+//  //void prepare() override;
+//  //void cleanup() override;
+//};
 
 class ChangePromptCommand: public BuiltInCommand {
 public:
@@ -77,7 +78,7 @@ class ChangeDirCommand: public BuiltInCommand {
 // TODO: Add your data members
 public:
     ChangeDirCommand(const char *cmd_line, string* plastPwd, string* currPwd);
-    virtual ~ChangeDirCommand() {}
+    ~ChangeDirCommand() override = default;
     void execute() override;
 
 private:
@@ -88,14 +89,14 @@ private:
 class GetCurrDirCommand: public BuiltInCommand {
  public:
   explicit GetCurrDirCommand(const char* cmd_line);
-  virtual ~GetCurrDirCommand() {}
+  ~GetCurrDirCommand() override = default;
   void execute() override;
 };
 
 class ShowPidCommand: public BuiltInCommand {
  public:
   explicit ShowPidCommand(const char* cmd_line);
-  virtual ~ShowPidCommand() {}
+  ~ShowPidCommand() override = default;
   void execute() override;
 };
 
@@ -103,7 +104,7 @@ class JobsList;
 class QuitCommand : public BuiltInCommand {
 public:
   QuitCommand(const char* cmd_line, JobsList* jobs);
-  virtual ~QuitCommand() {}
+  ~QuitCommand() override = default;
   void execute() override;
 
 private:
@@ -141,7 +142,7 @@ class JobsList {
   void removeFinishedJobs();
   JobEntry * getJobById(int jobId);
   void removeJobById(int jobId);
-  JobEntry * getLastJob(int* lastJobId);
+//  JobEntry * getLastJob(int* lastJobId);
   JobEntry *getLastStoppedJob();
   int getMaxJobId() const;
   bool isEmpty() const;
@@ -165,7 +166,7 @@ class JobsCommand : public BuiltInCommand {
 class ForegroundCommand : public BuiltInCommand {
  public:
   ForegroundCommand(const char* cmd_line, JobsList* jobs);
-  virtual ~ForegroundCommand() {}
+  ~ForegroundCommand() override = default;
   void execute() override;
 private:
     JobsList::JobEntry* m_job;
@@ -176,7 +177,7 @@ class BackgroundCommand : public BuiltInCommand {
  // TODO: Add your data members
 public:
     BackgroundCommand(const char* cmd_line, JobsList* jobs);
-    virtual ~BackgroundCommand() {}
+    ~BackgroundCommand() override = default;
     void execute() override;
 private:
     JobsList::JobEntry* m_bgJob;
@@ -185,43 +186,43 @@ private:
 
 };
 
-class TimeoutCommand : public BuiltInCommand {
-/* Bonus */
-// TODO: Add your data members
- public:
-  explicit TimeoutCommand(const char* cmd_line);
-  virtual ~TimeoutCommand() {}
-  void execute() override;
-};
+//class TimeoutCommand : public BuiltInCommand {
+///* Bonus */
+//// TODO: Add your data members
+// public:
+//  explicit TimeoutCommand(const char* cmd_line);
+//  virtual ~TimeoutCommand() {}
+//  void execute() override;
+//};
+//
+//class ChmodCommand : public BuiltInCommand {
+//  // TODO: Add your data members
+// public:
+//  ChmodCommand(const char* cmd_line);
+//  virtual ~ChmodCommand() {}
+//  void execute() override;
+//};
 
-class ChmodCommand : public BuiltInCommand {
-  // TODO: Add your data members
- public:
-  ChmodCommand(const char* cmd_line);
-  virtual ~ChmodCommand() {}
-  void execute() override;
-};
+//class GetFileTypeCommand : public BuiltInCommand {
+//  // TODO: Add your data members
+// public:
+//  GetFileTypeCommand(const char* cmd_line);
+//  virtual ~GetFileTypeCommand() {}
+//  void execute() override;
+//};
 
-class GetFileTypeCommand : public BuiltInCommand {
-  // TODO: Add your data members
- public:
-  GetFileTypeCommand(const char* cmd_line);
-  virtual ~GetFileTypeCommand() {}
-  void execute() override;
-};
-
-class SetcoreCommand : public BuiltInCommand {
-  // TODO: Add your data members
- public:
-  SetcoreCommand(const char* cmd_line);
-  virtual ~SetcoreCommand() {}
-  void execute() override;
-};
+//class SetcoreCommand : public BuiltInCommand {
+//  // TODO: Add your data members
+// public:
+//  SetcoreCommand(const char* cmd_line);
+//  virtual ~SetcoreCommand() {}
+//  void execute() override;
+//};
 
 class KillCommand : public BuiltInCommand {
  public:
     KillCommand(const char* cmd_line, JobsList* jobs);
-    virtual ~KillCommand() {}
+    ~KillCommand() override = default;
     void execute() override;
 private:
     JobsList::JobEntry* m_killJob;
@@ -256,8 +257,8 @@ public:
     void setPrompt(const std::string& new_prompt);
     string getCurrDir() const;
     string getLastDir() const;
-    void setCurrDir(char* dir);
-    void setLastDir(char* dir);
+    void setCurrDir(const string& dir);
+    void setLastDir(const string& dir);
     JobsList* getJobsList() const;
 
   // TODO: add extra methods as needed
