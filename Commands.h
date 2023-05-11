@@ -77,7 +77,7 @@ private:
 class ChangeDirCommand: public BuiltInCommand {
 // TODO: Add your data members
 public:
-    ChangeDirCommand(const char *cmd_line, string* plastPwd, string* currPwd);
+    ChangeDirCommand(const char *cmd_line, string* plastPwd);
     ~ChangeDirCommand() override = default;
     void execute() override;
 

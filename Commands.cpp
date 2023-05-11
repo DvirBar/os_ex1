@@ -70,23 +70,24 @@ bool _isBackgroundComamnd(const char* cmd_line) {
   return str[str.find_last_not_of(WHITESPACE)] == '&';
 }
 
-void _removeBackgroundSign(char* cmd_line) {
+string _removeBackgroundSign(string cmd_line) {
   const string str(cmd_line);
   // find last character other than spaces
-  unsigned int idx = str.find_last_not_of(WHITESPACE);
+  ::size_t idx = str.find_last_not_of(WHITESPACE);
   // if all characters are spaces then return
-  // TODO: Uncomment
-//  if (idx == string::npos) {
-//    return;
-//  }
+
+  if (idx == string::npos) {
+    return cmd_line;
+  }
   // if the command line does not end with & then return
   if (cmd_line[idx] != '&') {
-    return;
+    return cmd_line;
   }
   // replace the & (background sign) with space and then remove all tailing spaces.
   cmd_line[idx] = ' ';
   // truncate the command line string up to the last non-space character
   cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
+    return cmd_line;
 }
 /* ------------------------------------------ Command Smash and Built in ------------------------------------------- */
 SmallShell::SmallShell() {
@@ -103,7 +104,7 @@ SmallShell::~SmallShell() {
 }
 
 string SmallShell::getCurrDir() const {
-    return m_currPwd;
+    return getcwd(nullptr, 0);
 }
 
 string SmallShell::getLastDir() const {
@@ -156,7 +157,9 @@ BuiltInCommand::BuiltInCommand(const char *cmd_line):
 */
 Command * SmallShell::CreateCommand(const char* cmd_line) {
   string cmd_s = _trim(string(cmd_line));
-  string commandStr = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
+  string rawCmdStr = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
+  string commandStr = _trim(_removeBackgroundSign(rawCmdStr));
+  bool isBackground = rawCmdStr != commandStr;
 
   if (commandStr == "pwd") {
     return new GetCurrDirCommand(cmd_line);
@@ -173,9 +176,8 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
   else if(commandStr == "cd") {
       auto lastPwd = getInstance().getLastDir();
       auto currPwd = getInstance().getCurrDir();
-      auto cdCom = new ChangeDirCommand(cmd_line, &lastPwd, &currPwd);
-      setLastDir(lastPwd);
-      setCurrDir(currPwd);
+      auto cdCom = new ChangeDirCommand(cmd_line, &lastPwd);
+      setLastDir(getCurrDir());
       return cdCom;
   }
 
@@ -204,11 +206,11 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 }
 
 void SmallShell::executeCommand(const char *cmd_line) {
-    jobs->removeFinishedJobs();
-    Command* cmd = CreateCommand(cmd_line);
-
     try {
+        jobs->removeFinishedJobs();
+        Command* cmd = CreateCommand(cmd_line);
         cmd->execute();
+        delete cmd;
     }
     catch (const SyscallException& error) {
         ::perror(error.what());
@@ -216,8 +218,6 @@ void SmallShell::executeCommand(const char *cmd_line) {
         cerr << error.what() << endl;
     }
     // Please note that you must fork smash process for some commands (e.g., external commands....)
-
-    delete cmd;
 }
 
 
@@ -258,7 +258,7 @@ void GetCurrDirCommand::execute() {
 }
 
 
-ChangeDirCommand::ChangeDirCommand(const char *cmd_line, string* plastPwd, string* currPwd):
+ChangeDirCommand::ChangeDirCommand(const char *cmd_line, string* plastPwd):
         BuiltInCommand(cmd_line)
 {
     if(m_numArgs > MAX_ARGS) {
@@ -270,16 +270,13 @@ ChangeDirCommand::ChangeDirCommand(const char *cmd_line, string* plastPwd, strin
     char* arg = m_args[1];
 
     if(arg == string("-")) {
-        if (plastPwd == nullptr) {
+        if (*plastPwd == string("")) {
             throw NoPWDError();
         }
         m_targetPwd = *plastPwd;
     } else {
         m_targetPwd = arg;
     }
-
-    plastPwd = currPwd;
-    *currPwd = m_targetPwd;
 }
 
 void ChangeDirCommand::execute() {
@@ -287,6 +284,8 @@ void ChangeDirCommand::execute() {
     if(retValue == RET_VALUE_ERROR) {
         throw SyscallException("chdir");
     }
+
+    SmallShell::getInstance().setCurrDir(getcwd(nullptr, 0));
 }
 
 JobsCommand::JobsCommand(const char *cmd_line, JobsList *jobs) :
@@ -387,7 +386,7 @@ QuitCommand::QuitCommand(const char *cmd_line, JobsList *jobs):
     execKill(false),
     m_jobs(jobs)
 {
-    if(m_args[1] == string("kill")) {
+    if(m_numArgs > NO_ARGS && m_args[1] == string("kill")) {
         execKill = true;
     }
 }
