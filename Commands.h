@@ -51,7 +51,7 @@ class ExternalCommand: public Command {
   void execute() override;
 
 private:
-    static void execSimpleCommand(char* m_args[Command::CMD_MAX_NUM_ARGS+1]);
+    static void execSimpleCommand(char* m_args[Command::CMD_MAX_NUM_ARGS+1], bool isBackground, Command* cmd);
 };
 
 //class PipeCommand : public Command {
@@ -123,7 +123,7 @@ class JobsList {
 public:
     class JobEntry {
     public:
-        JobEntry(int jobId, int jobPid, Command *cmd, bool isStopped);
+        JobEntry(int jobId, int jobPid, const char* cmdLine, bool isStopped);
         bool isJobStopped() const;
         pid_t getPid() const;
         void print(bool showStoppedFlag, bool includeTime = true) const;
@@ -134,7 +134,7 @@ public:
     private:
         int m_jobId;
         pid_t m_pid;
-        Command* m_cmd;
+        string m_cmdLine;
         bool m_isStopped;
         time_t m_insertTime;
 
@@ -143,7 +143,7 @@ public:
  public:
     JobsList() = default;
     ~JobsList();
-    void addJob(Command* cmd, bool isStopped = false);
+    void addJob(Command* cmd, pid_t pid, bool isStopped = false);
     void printJobsList();
     void killAllJobs();
     void removeFinishedJobs();
