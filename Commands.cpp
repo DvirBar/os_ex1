@@ -4,7 +4,7 @@
 #include <vector>
 #include <sstream>
 #include <sys/wait.h>
-#include <sys/sysinfo.h>
+//#include <sys/sysinfo.h>
 #include <sched.h>
 #include <iomanip>
 #include <exception>
@@ -139,9 +139,9 @@ Command::Command(const char *cmd_line):
     this->m_numArgs = numArgs;
 
     if(hasBackgroundSign(string(cmd_line))) {
-        isBackground = true;
+        m_isBackground = true;
     } else {
-        isBackground = false;
+        m_isBackground = false;
     }
 }
 
@@ -162,7 +162,7 @@ bool Command::hasBackgroundSign(string cmd_line) {
 }
 
 const char *Command::getCmdLine() const {
-    return m_cmdLine;
+    return m_rawCmdLine;
 }
 
 BuiltInCommand::BuiltInCommand(const char *cmd_line):
@@ -212,11 +212,11 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
       return new QuitCommand(cmd_line, getJobsList());
   }
 
-//  else if(commandStr == "kill") {
+  else if(commandStr == "kill") {
       return new KillCommand(cmd_line, getJobsList());
-//  }
+  }
 
-// return new ExternalCommand(cmd_line);
+ return new ExternalCommand(cmd_line);
 
 }
 
@@ -456,44 +456,101 @@ void KillCommand::execute() {
     cout << "signal number " << m_sig << " was sent to pid " << pid << endl;
 }
 
+/* ----------------------------------------------- External Commands ------------------------------------------------- */
+ExternalCommand::ExternalCommand(const char *cmd_line):
+        Command(cmd_line)
+{}
+
+void ExternalCommand::execute() {
+    string cmdlineStr = m_cmdLine;
+    int forkPid = 0;
+    if(cmdlineStr.find('*') != string::npos || cmdlineStr.find('?') != string::npos) {
+        forkPid = fork();
+        if(forkPid > 0) {
+            if(!m_isBackground) {
+                wait(nullptr);
+            }
+            else
+                SmallShell::getInstance().getJobsList()->addJob(this, forkPid);
+        }
+
+        else if(forkPid == 0) {
+            char* bashArgs[] = {(char*)"-c", (char*)m_rawCmdLine, nullptr};
+            execvp("/bin/bash", bashArgs);
+        }
+
+        else {
+            throw SyscallException("fork");
+        }
+    }
+
+    else {
+        execSimpleCommand(m_args, m_isBackground, this);
+    }
+
+}
+
+void ExternalCommand::execSimpleCommand(char* args[Command::CMD_MAX_NUM_ARGS+1], bool isBackground, Command* cmd) {
+    pid_t pid = fork();
+    // Child process
+    if(pid == 0) {
+        string filename = string("/bin/") + string(args[0]);
+        execv(filename.c_str(), args);
+    }
+
+    else if(pid > 0) {
+        if(!isBackground) {
+            waitpid(pid, nullptr, 0);
+        } else {
+            SmallShell::getInstance().getJobsList()->addJob(cmd, pid);
+        }
+    }
+
+    else {
+        throw SyscallException("fork");
+    }
+}
+
+
+
 /* ----------------------------------------------- Special Commands ------------------------------------------------- */
 
-SetcoreCommand::SetcoreCommand(const char *cmd_line, JobsList* jobs) :
-    BuiltInCommand(cmd_line)
-{
-    int requestedJobId = 0;
-    int requestedCore = 0;
-
-    try {
-        if(m_numArgs == Command::NO_ARGS) {
-            throw SetCoreInvalidArguments();
-        }
-        requestedJobId = stoi(m_args[1]);
-        requestedCore = stoi(m_args[2]);
-        m_setCoreJob = jobs->getJobById(requestedJobId);
-        if(requestedCore >= get_nprocs() || requestedCore < 0) {
-            throw SetCoreInvalidCoreError();
-        }
-        m_core = requestedCore;
-    }
-
-    catch (invalid_argument& invalidArgument) {
-        throw SetCoreInvalidArguments();
-    }
-
-    catch (JobNotFoundError& jobNotFoundError) {
-        throw SetCoreJobNotFoundError(requestedJobId);
-    }
-}
-
-void SetcoreCommand::execute() {
-    cpu_set_t jobCPUMask;
-    CPU_ZERO(&jobCPUMask);
-    CPU_SET(m_core, &jobCPUMask);
-    if(sched_setaffinity(m_setCoreJob->getPid(), sizeof(jobCPUMask), &jobCPUMask) == RET_VALUE_ERROR) {
-        throw SyscallException("sched_setaffinity");
-    }
-}
+//SetcoreCommand::SetcoreCommand(const char *cmd_line, JobsList* jobs) :
+//    BuiltInCommand(cmd_line)
+//{
+//    int requestedJobId = 0;
+//    int requestedCore = 0;
+//
+//    try {
+//        if(m_numArgs == Command::NO_ARGS) {
+//            throw SetCoreInvalidArguments();
+//        }
+//        requestedJobId = stoi(m_args[1]);
+//        requestedCore = stoi(m_args[2]);
+//        m_setCoreJob = jobs->getJobById(requestedJobId);
+//        if(requestedCore >= get_nprocs() || requestedCore < 0) {
+//            throw SetCoreInvalidCoreError();
+//        }
+//        m_core = requestedCore;
+//    }
+//
+//    catch (invalid_argument& invalidArgument) {
+//        throw SetCoreInvalidArguments();
+//    }
+//
+//    catch (JobNotFoundError& jobNotFoundError) {
+//        throw SetCoreJobNotFoundError(requestedJobId);
+//    }
+//}
+//
+//void SetcoreCommand::execute() {
+//    cpu_set_t jobCPUMask;
+//    CPU_ZERO(&jobCPUMask);
+//    CPU_SET(m_core, &jobCPUMask);
+//    if(sched_setaffinity(m_setCoreJob->getPid(), sizeof(jobCPUMask), &jobCPUMask) == RET_VALUE_ERROR) {
+//        throw SyscallException("sched_setaffinity");
+//    }
+//}
 
 
 
@@ -504,17 +561,21 @@ JobsList::~JobsList() {
     }
 }
 
-void JobsList::addJob(Command *cmd, bool isStopped) {
+void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
     int jobId = assignJobId(jobs);
-    auto jobEntry = new JobEntry(jobId, 0, cmd, isStopped);
+    auto jobEntry = new JobEntry(jobId, pid, cmd->getCmdLine(), isStopped);
     jobs.insert({jobId, jobEntry});
 }
 
 int JobsList::assignJobId(map<int, JobEntry*> jobs) {
+    if(jobs.empty()) {
+        return 1;
+    }
+
     return jobs.rbegin()->first + 1;
 }
 
-void JobsList::removeJobById(int jobId) {
+ void JobsList::removeJobById(int jobId) {
     JobEntry* jobEntry = getJobById(jobId);
     jobs.erase(jobId);
     delete jobEntry;
@@ -534,10 +595,10 @@ bool JobsList::isEmpty() const {
     return jobs.empty();
 }
 
-JobsList::JobEntry::JobEntry(int jobId, int jobPid, Command *cmd, bool isStopped) :
+JobsList::JobEntry::JobEntry(int jobId, int jobPid, const char* cmdLine, bool isStopped) :
     m_jobId(jobId),
     m_pid(jobPid),
-    m_cmd(cmd),
+    m_cmdLine(cmdLine),
     m_isStopped(isStopped),
     m_insertTime(time(nullptr))
 { }
@@ -560,8 +621,8 @@ void JobsList::JobEntry::print( bool showStoppedFlag, bool includeTime) const {
     time_t currTime = time(nullptr);
 
     if(includeTime) {
-        timeDiff = difftime(m_insertTime, currTime);
-        timeStr = " " + to_string(timeDiff) + " secs";
+        timeDiff = difftime(currTime, m_insertTime);
+        timeStr = " " + to_string(int(timeDiff)) + " secs";
     }
 
     string stoppedFlag;
@@ -569,11 +630,11 @@ void JobsList::JobEntry::print( bool showStoppedFlag, bool includeTime) const {
         stoppedFlag = " (stopped)";
     }
 
-    cout << "[" << m_jobId << "] " << m_cmd->getCmdLine() << " : " << m_pid << timeStr << stoppedFlag << endl;
+    cout << "[" << m_jobId << "] " << m_cmdLine << " : " << m_pid << timeStr << stoppedFlag << endl;
 }
 
 void JobsList::JobEntry::printCmdLine() const {
-    cout << m_cmd->getCmdLine() << " : " << m_pid << endl;
+    cout << m_cmdLine << " : " << m_pid << endl;
 }
 
 void JobsList::JobEntry::continueJob() {
@@ -595,23 +656,26 @@ int JobsList::getMaxJobId() const {
 void JobsList::removeFinishedJobs() {
     int status;
     int waitpidCheck;
-    for (auto job: jobs) {
-        waitpidCheck = waitpid(job.second->getPid(), &status, WNOHANG);
-
+    if(jobs.empty()) {
+        return;
+    }
+    for (auto it = jobs.begin(); it->first != jobs.end()->first;) {
+        waitpidCheck = waitpid(it->second->getPid(), &status, WNOHANG);
         if(waitpidCheck > 0) {
-            removeJobById(job.first);
+            removeJobById(it->first);
         }
-
         else if(waitpidCheck == RET_VALUE_ERROR) {
             throw SyscallException("waitpid");
+        } else {
+            it++;
         }
     }
 }
 
 void JobsList::printJobsList() {
     removeFinishedJobs();
-    for(auto job: jobs){
-        job.second->print(true, true);
+    for(auto it = jobs.begin(); it != jobs.end(); it++){
+        it->second->print(true, true);
     }
 }
 

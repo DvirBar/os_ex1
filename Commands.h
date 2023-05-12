@@ -22,16 +22,16 @@ public:
     const char* getCmdLine() const;
 
     static const int MAX_COMMAND_SIZE = 80;
+    static const int CMD_MAX_NUM_ARGS = 20;
 
 protected:
     static const int NO_ARGS = 0;
-    static const int CMD_MAX_NUM_ARGS = 20;
 
     const char* m_cmdLine;
     const char* m_rawCmdLine;
     char* m_args[CMD_MAX_NUM_ARGS+1];
     int m_numArgs;
-    bool isBackground;
+    bool m_isBackground;
 
 private:
     static bool hasBackgroundSign(string cmd_line);
@@ -44,12 +44,15 @@ public:
     ~BuiltInCommand() override = default;
 };
 
-//class ExternalCommand: public Command {
-// public:
-//  explicit ExternalCommand(const char* cmd_line);
-//  virtual ~ExternalCommand() = default;
-//  void execute() override;
-//};
+class ExternalCommand: public Command {
+ public:
+  explicit ExternalCommand(const char* cmd_line);
+  virtual ~ExternalCommand() = default;
+  void execute() override;
+
+private:
+    static void execSimpleCommand(char* m_args[Command::CMD_MAX_NUM_ARGS+1], bool isBackground, Command* cmd);
+};
 
 //class PipeCommand : public Command {
 //  // TODO: Add your data members
@@ -120,7 +123,7 @@ class JobsList {
 public:
     class JobEntry {
     public:
-        JobEntry(int jobId, int jobPid, Command *cmd, bool isStopped);
+        JobEntry(int jobId, int jobPid, const char* cmdLine, bool isStopped);
         bool isJobStopped() const;
         pid_t getPid() const;
         void print(bool showStoppedFlag, bool includeTime = true) const;
@@ -131,7 +134,7 @@ public:
     private:
         int m_jobId;
         pid_t m_pid;
-        Command* m_cmd;
+        string m_cmdLine;
         bool m_isStopped;
         time_t m_insertTime;
 
@@ -140,7 +143,7 @@ public:
  public:
     JobsList() = default;
     ~JobsList();
-    void addJob(Command* cmd, bool isStopped = false);
+    void addJob(Command* cmd, pid_t pid, bool isStopped = false);
     void printJobsList();
     void killAllJobs();
     void removeFinishedJobs();
