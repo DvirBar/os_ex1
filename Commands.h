@@ -40,12 +40,15 @@ public:
     ~BuiltInCommand() override = default;
 };
 
-//class ExternalCommand: public Command {
-// public:
-//  explicit ExternalCommand(const char* cmd_line);
-//  virtual ~ExternalCommand() = default;
-//  void execute() override;
-//};
+class ExternalCommand: public Command {
+public:
+    explicit ExternalCommand(const char* cmd_line);
+    ~ExternalCommand() override;
+    void execute() override;
+private:
+    bool m_isBackground;
+    char* m_cmdWithoutBg;
+};
 
 //class PipeCommand : public Command {
 //  // TODO: Add your data members

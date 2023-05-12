@@ -197,11 +197,11 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
       return new QuitCommand(cmd_line, getJobsList());
   }
 
-//  else if(commandStr == "kill") {
+  else if(commandStr == "kill") {
       return new KillCommand(cmd_line, getJobsList());
-//  }
+  }
 
-// return new ExternalCommand(cmd_line);
+ return new ExternalCommand(cmd_line);
 
 }
 
@@ -439,6 +439,51 @@ void KillCommand::execute() {
         throw SyscallException("kill");
     }
     cout << "signal number " << m_sig << " was sent to pid " << pid << endl;
+}
+
+/* ----------------------------------------------- External Commands ------------------------------------------------- */
+
+ExternalCommand::ExternalCommand(const char *cmd_line) :
+        Command(cmd_line),
+        m_isBackground(_isBackgroundComamnd(cmd_line))
+{
+    m_cmdWithoutBg = strdup(cmd_line);
+    _removeBackgroundSign(m_cmdWithoutBg);
+}
+
+void ExternalCommand::execute() {
+    string cmdlineStr = m_cmdLine;
+    int forkPid = 0;
+    if(cmdlineStr.find('*') != string::npos || cmdlineStr.find('?') != string::npos) {
+        // TODO: Complex
+        forkPid = fork();
+        if(forkPid > 0) {
+            if(!m_isBackground) {
+                wait(nullptr);
+            }
+            else
+                SmallShell::getInstance().getJobsList()->addJob(this);
+        }
+
+        else if(forkPid == 0) {
+
+            char* bashArgs[] = {(char*)"-c", m_cmdWithoutBg, nullptr};
+            execvp("/bin/bash", bashArgs);
+        }
+
+        else {
+            throw SyscallException("fork");
+        }
+    }
+
+    else {
+        // TODO: Simple
+    }
+
+}
+
+ExternalCommand::~ExternalCommand() {
+    free(m_cmdWithoutBg);
 }
 
 /* ----------------------------------------------- Special Commands ------------------------------------------------- */
