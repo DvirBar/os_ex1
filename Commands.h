@@ -30,7 +30,10 @@ protected:
     const char* m_cmdLine;
     char* m_args[CMD_MAX_NUM_ARGS+1];
     int m_numArgs;
+    bool isBackground;
 
+private:
+    static bool hasBackgroundSign(string cmd_line);
 
 };
 
