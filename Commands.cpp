@@ -4,7 +4,7 @@
 #include <vector>
 #include <sstream>
 #include <sys/wait.h>
-#include <sys/sysinfo.h>
+//#include <sys/sysinfo.h>
 #include <sched.h>
 #include <iomanip>
 #include <exception>
@@ -131,17 +131,20 @@ void SmallShell::setPrompt(const std::string &new_prompt) {
     m_smashPrompt = new_prompt;
 }
 
-Command::Command(const char *cmd_line)
+Command::Command(const char *cmd_line):
+    m_rawCmdLine(cmd_line)
 {
     m_cmdLine = _removeBackgroundSign(cmd_line).c_str();
     int numArgs = _parseCommandLine(m_cmdLine, m_args)-1;
     this->m_numArgs = numArgs;
 
     if(hasBackgroundSign(string(cmd_line))) {
-        isBackground = true;
+        m_isBackground = true;
+    } else {
+        m_isBackground = false;
     }
 
-    isBackground = false;
+
 }
 
 Command::~Command() {
@@ -454,6 +457,56 @@ void KillCommand::execute() {
     }
     cout << "signal number " << m_sig << " was sent to pid " << pid << endl;
 }
+
+/* ----------------------------------------------- External Commands ------------------------------------------------- */
+
+void ExternalCommand::execute() {
+    string cmdlineStr = m_cmdLine;
+    int forkPid = 0;
+    if(cmdlineStr.find('*') != string::npos || cmdlineStr.find('?') != string::npos) {
+        forkPid = fork();
+        if(forkPid > 0) {
+            if(!m_isBackground) {
+                wait(nullptr);
+            }
+            else
+                SmallShell::getInstance().getJobsList()->addJob(this);
+        }
+
+        else if(forkPid == 0) {
+            char* bashArgs[] = {(char*)"-c", (char*)m_rawCmdLine, nullptr};
+            execvp("/bin/bash", bashArgs);
+        }
+
+        else {
+            throw SyscallException("fork");
+        }
+    }
+
+    else {
+
+    }
+
+}
+
+void ExternalCommand::execSimpleCommand(char* args[Command::CMD_MAX_NUM_ARGS+1], bool isBackground) {
+    pid_t pid = fork();
+    // Child process
+    if(pid == 0) {
+        string filename = string("/bin/") + string(args[0]);
+        execv(filename.c_str(), args);
+    }
+
+    else if(pid > 0) {
+        if(!isBackground) {
+            waitpid(pid, nullptr, 0);
+        } else {
+            SmallShell::getInstance().getJobsList()->addJob(this);
+        }
+    }
+}
+
+
 
 /* ----------------------------------------------- Special Commands ------------------------------------------------- */
 

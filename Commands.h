@@ -22,15 +22,16 @@ public:
     const char* getCmdLine() const;
 
     static const int MAX_COMMAND_SIZE = 80;
+    static const int CMD_MAX_NUM_ARGS = 20;
 
 protected:
     static const int NO_ARGS = 0;
-    static const int CMD_MAX_NUM_ARGS = 20;
 
     const char* m_cmdLine;
+    const char* m_rawCmdLine;
     char* m_args[CMD_MAX_NUM_ARGS+1];
     int m_numArgs;
-    bool isBackground;
+    bool m_isBackground;
 
 private:
     static bool hasBackgroundSign(string cmd_line);
@@ -43,12 +44,15 @@ public:
     ~BuiltInCommand() override = default;
 };
 
-//class ExternalCommand: public Command {
-// public:
-//  explicit ExternalCommand(const char* cmd_line);
-//  virtual ~ExternalCommand() = default;
-//  void execute() override;
-//};
+class ExternalCommand: public Command {
+ public:
+  explicit ExternalCommand(const char* cmd_line);
+  virtual ~ExternalCommand() = default;
+  void execute() override;
+
+private:
+    static void execSimpleCommand(char* m_args[Command::CMD_MAX_NUM_ARGS+1]);
+};
 
 //class PipeCommand : public Command {
 //  // TODO: Add your data members
