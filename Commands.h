@@ -28,6 +28,7 @@ protected:
     static const int CMD_MAX_NUM_ARGS = 20;
 
     const char* m_cmdLine;
+    const char* m_rawCmdLine;
     char* m_args[CMD_MAX_NUM_ARGS+1];
     int m_numArgs;
     bool isBackground;
