@@ -71,9 +71,8 @@ bool _isBackgroundComamnd(const char* cmd_line) {
 }
 
 string _removeBackgroundSign(string cmd_line) {
-  const string str(cmd_line);
   // find last character other than spaces
-  ::size_t idx = str.find_last_not_of(WHITESPACE);
+  ::size_t idx = cmd_line.find_last_not_of(WHITESPACE);
   // if all characters are spaces then return
 
   if (idx == string::npos) {
@@ -85,8 +84,9 @@ string _removeBackgroundSign(string cmd_line) {
   }
   // replace the & (background sign) with space and then remove all tailing spaces.
   cmd_line[idx] = ' ';
-  // truncate the command line string up to the last non-space character
-  cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
+//  // truncate the command line string up to the last non-space character
+//  cmd_line[cmd_line.find_last_not_of(WHITESPACE, idx) + 1] = 0;
+
     return cmd_line;
 }
 /* ------------------------------------------ Command Smash and Built in ------------------------------------------- */
@@ -132,16 +132,33 @@ void SmallShell::setPrompt(const std::string &new_prompt) {
 }
 
 Command::Command(const char *cmd_line):
-    m_cmdLine(cmd_line)
+    m_rawCmdLine(cmd_line)
 {
-    int numArgs = _parseCommandLine(cmd_line, m_args)-1;
+    m_cmdLine = _removeBackgroundSign(cmd_line).c_str();
+    int numArgs = _parseCommandLine(m_cmdLine, m_args)-1;
     this->m_numArgs = numArgs;
+
+    if(hasBackgroundSign(string(cmd_line))) {
+        isBackground = true;
+    } else {
+        isBackground = false;
+    }
 }
 
 Command::~Command() {
     for(int i=0; i<m_numArgs; i++) {
         ::free(m_args[i]);
     }
+}
+
+bool Command::hasBackgroundSign(string cmd_line) {
+    ::size_t idx = cmd_line.find_last_not_of(WHITESPACE);
+
+    if (idx == string::npos || cmd_line[idx] != '&') {
+        return false;
+    }
+
+    return true;
 }
 
 const char *Command::getCmdLine() const {
@@ -156,10 +173,8 @@ BuiltInCommand::BuiltInCommand(const char *cmd_line):
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
 Command * SmallShell::CreateCommand(const char* cmd_line) {
-  string cmd_s = _trim(string(cmd_line));
-  string rawCmdStr = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
-  string commandStr = _trim(_removeBackgroundSign(rawCmdStr));
-  bool isBackground = rawCmdStr != commandStr;
+  string cmd_s = _trim(_removeBackgroundSign(cmd_line));
+  string commandStr = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
 
   if (commandStr == "pwd") {
     return new GetCurrDirCommand(cmd_line);
