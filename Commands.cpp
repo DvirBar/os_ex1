@@ -84,8 +84,8 @@ string _removeBackgroundSign(string cmd_line) {
   }
   // replace the & (background sign) with space and then remove all tailing spaces.
   cmd_line[idx] = ' ';
-  // truncate the command line string up to the last non-space character
-  cmd_line[cmd_line.find_last_not_of(WHITESPACE, idx) + 1] = 0;
+//  // truncate the command line string up to the last non-space character
+//  cmd_line[cmd_line.find_last_not_of(WHITESPACE, idx) + 1] = 0;
 
     return cmd_line;
 }
@@ -131,10 +131,10 @@ void SmallShell::setPrompt(const std::string &new_prompt) {
     m_smashPrompt = new_prompt;
 }
 
-Command::Command(const char *cmd_line):
-    m_cmdLine(cmd_line)
+Command::Command(const char *cmd_line)
 {
-    int numArgs = _parseCommandLine(cmd_line, m_args)-1;
+    m_cmdLine = _removeBackgroundSign(cmd_line).c_str();
+    int numArgs = _parseCommandLine(m_cmdLine, m_args)-1;
     this->m_numArgs = numArgs;
 
     if(hasBackgroundSign(string(cmd_line))) {
@@ -172,7 +172,7 @@ BuiltInCommand::BuiltInCommand(const char *cmd_line):
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
 Command * SmallShell::CreateCommand(const char* cmd_line) {
-  string cmd_s = _trim(string(_removeBackgroundSign(cmd_line)));
+  string cmd_s = _trim(_removeBackgroundSign(cmd_line));
   string commandStr = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
 
   if (commandStr == "pwd") {
