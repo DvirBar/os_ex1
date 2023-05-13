@@ -126,6 +126,8 @@ public:
         JobEntry(int jobId, int jobPid, const char* cmdLine, bool isStopped);
         bool isJobStopped() const;
         pid_t getPid() const;
+        int getJobId() const;
+        string getCmdLine() const;
         void print(bool showStoppedFlag, bool includeTime = true) const;
         void printCmdLine() const;
         void continueJob();
@@ -143,7 +145,7 @@ public:
  public:
     JobsList() = default;
     ~JobsList();
-    void addJob(Command* cmd, pid_t pid, bool isStopped = false);
+    void addJob(const char* rawCmdLine, pid_t pid, bool isStopped = false);
     void printJobsList();
     void killAllJobs();
     void removeFinishedJobs();
@@ -154,11 +156,10 @@ public:
     int getMaxJobId() const;
     bool isEmpty() const;
 //  JobEntry* getJobById(char* jobId) const;
-  // TODO: Add extra methods or modify exisitng ones as needed
 
 private:
-    static int assignJobId(map<int, JobEntry*> jobs);
     map<int, JobEntry*> jobs;
+    static int assignJobId(map<int, JobEntry*> jobs);
 };
 
 class JobsCommand : public BuiltInCommand {
@@ -176,6 +177,7 @@ public:
     void execute() override;
 private:
     JobsList::JobEntry* m_job;
+    JobsList* m_jobs;
     static const int FG_MAX_NUM_ARGS = 1;
 };
 
@@ -243,6 +245,7 @@ private:
     SmallShell();
     std::string m_smashPrompt;
     JobsList* jobs;
+    JobsList::JobEntry* m_foregroundJob;
     string m_lastPwd;
     string m_currPwd;
 
@@ -267,8 +270,12 @@ public:
     void setCurrDir(const string& dir);
     void setLastDir(const string& dir);
     JobsList* getJobsList() const;
+    JobsList::JobEntry* getForegroundJob() const;
+    void setForegroundJob(JobsList::JobEntry* jobEntry);
+//    pid_t getForegroundPid() const;
+//    void setForegroundPid(pid_t pid);
 
-  // TODO: add extra methods as needed
+    static const int RET_VALUE_ERROR = -1;
 };
 
 #endif //SMASH_COMMAND_H_

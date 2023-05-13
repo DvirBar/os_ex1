@@ -90,7 +90,9 @@ string _removeBackgroundSign(string cmd_line) {
     return cmd_line;
 }
 /* ------------------------------------------ Command Smash and Built in ------------------------------------------- */
-SmallShell::SmallShell() {
+SmallShell::SmallShell():
+    m_foregroundJob(nullptr)
+{
     m_currPwd = getcwd(nullptr, 0);
     jobs = new JobsList;
     if(m_currPwd == string("")) {
@@ -129,6 +131,14 @@ const std::string& SmallShell::getPrompt() const {
 
 void SmallShell::setPrompt(const std::string &new_prompt) {
     m_smashPrompt = new_prompt;
+}
+
+JobsList::JobEntry* SmallShell::getForegroundJob() const {
+    return m_foregroundJob;
+}
+
+void SmallShell::setForegroundJob(JobsList::JobEntry *jobEntry) {
+    m_foregroundJob = jobEntry;
 }
 
 Command::Command(const char *cmd_line):
@@ -312,7 +322,8 @@ void JobsCommand::execute() {
 }
 
 ForegroundCommand::ForegroundCommand(const char *cmd_line, JobsList *jobs):
-        BuiltInCommand(cmd_line)
+        BuiltInCommand(cmd_line),
+        m_jobs(jobs)
 {
     int jobId = 0;
     try {
@@ -348,10 +359,11 @@ void ForegroundCommand::execute() {
         if(kill(m_job->getPid(), SIGCONT) == RET_VALUE_ERROR) {
             throw SyscallException("kill");
         }
+
+        m_jobs->removeJobById(m_job->getJobId());
     }
 
-    int status;
-    if(waitpid(m_job->getPid(), &status, 0) == RET_VALUE_ERROR) {
+    if(waitpid(m_job->getPid(), nullptr, 0) == RET_VALUE_ERROR) {
         throw SyscallException("waitpid");
     }
 }
@@ -471,7 +483,7 @@ void ExternalCommand::execute() {
                 wait(nullptr);
             }
             else
-                SmallShell::getInstance().getJobsList()->addJob(this, forkPid);
+                SmallShell::getInstance().getJobsList()->addJob(this->getCmdLine(), forkPid);
         }
 
         else if(forkPid == 0) {
@@ -500,9 +512,12 @@ void ExternalCommand::execSimpleCommand(char* args[Command::CMD_MAX_NUM_ARGS+1],
 
     else if(pid > 0) {
         if(!isBackground) {
+            auto jobEntry = new JobsList::JobEntry(0, pid, cmd->getCmdLine(), false);
+            SmallShell::getInstance().setForegroundJob(jobEntry);
             waitpid(pid, nullptr, 0);
+            SmallShell::getInstance().setForegroundJob(nullptr);
         } else {
-            SmallShell::getInstance().getJobsList()->addJob(cmd, pid);
+            SmallShell::getInstance().getJobsList()->addJob(cmd->getCmdLine(), pid);
         }
     }
 
@@ -561,9 +576,9 @@ JobsList::~JobsList() {
     }
 }
 
-void JobsList::addJob(Command *cmd, pid_t pid, bool isStopped) {
+void JobsList::addJob(const char* rawCmdLine, pid_t pid, bool isStopped) {
     int jobId = assignJobId(jobs);
-    auto jobEntry = new JobEntry(jobId, pid, cmd->getCmdLine(), isStopped);
+    auto jobEntry = new JobEntry(jobId, pid, rawCmdLine, isStopped);
     jobs.insert({jobId, jobEntry});
 }
 
@@ -591,6 +606,8 @@ JobsList::JobEntry* JobsList::getJobById(int jobId) {
     return jobIterator->second;
 }
 
+
+
 bool JobsList::isEmpty() const {
     return jobs.empty();
 }
@@ -609,6 +626,14 @@ bool JobsList::JobEntry::isJobStopped() const {
 
 int JobsList::JobEntry::getPid() const {
     return m_pid;
+}
+
+int JobsList::JobEntry::getJobId() const {
+    return m_jobId;
+}
+
+string JobsList::JobEntry::getCmdLine() const {
+    return m_cmdLine;
 }
 
 /*
