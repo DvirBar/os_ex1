@@ -22,16 +22,16 @@ public:
     const char* getCmdLine() const;
 
     static const int MAX_COMMAND_SIZE = 80;
+    static const int CMD_MAX_NUM_ARGS = 20;
 
 protected:
     static const int NO_ARGS = 0;
-    static const int CMD_MAX_NUM_ARGS = 20;
 
     const char* m_cmdLine;
     const char* m_rawCmdLine;
     char* m_args[CMD_MAX_NUM_ARGS+1];
     int m_numArgs;
-    bool isBackground;
+    bool m_isBackground;
 
 private:
     static bool hasBackgroundSign(string cmd_line);
@@ -45,11 +45,13 @@ public:
 };
 
 class ExternalCommand: public Command {
-public:
-    explicit ExternalCommand(const char* cmd_line);
-    ~ExternalCommand() override = default;
-    void execute() override;
+ public:
+  explicit ExternalCommand(const char* cmd_line);
+  virtual ~ExternalCommand() = default;
+  void execute() override;
+
 private:
+    static void execSimpleCommand(char* m_args[Command::CMD_MAX_NUM_ARGS+1], bool isBackground, Command* cmd);
 };
 
 //class PipeCommand : public Command {
@@ -121,9 +123,11 @@ class JobsList {
 public:
     class JobEntry {
     public:
-        JobEntry(int jobId, int jobPid, Command *cmd, bool isStopped);
+        JobEntry(int jobId, int jobPid, const char* cmdLine, bool isStopped);
         bool isJobStopped() const;
         pid_t getPid() const;
+        int getJobId() const;
+        string getCmdLine() const;
         void print(bool showStoppedFlag, bool includeTime = true) const;
         void printCmdLine() const;
         void continueJob();
@@ -132,7 +136,7 @@ public:
     private:
         int m_jobId;
         pid_t m_pid;
-        Command* m_cmd;
+        string m_cmdLine;
         bool m_isStopped;
         time_t m_insertTime;
 
@@ -141,7 +145,7 @@ public:
  public:
     JobsList() = default;
     ~JobsList();
-    void addJob(Command* cmd, bool isStopped = false);
+    void addJob(const char* rawCmdLine, pid_t pid, bool isStopped = false);
     void printJobsList();
     void killAllJobs();
     void removeFinishedJobs();
@@ -152,11 +156,10 @@ public:
     int getMaxJobId() const;
     bool isEmpty() const;
 //  JobEntry* getJobById(char* jobId) const;
-  // TODO: Add extra methods or modify exisitng ones as needed
 
 private:
-    static int assignJobId(map<int, JobEntry*> jobs);
     map<int, JobEntry*> jobs;
+    static int assignJobId(map<int, JobEntry*> jobs);
 };
 
 class JobsCommand : public BuiltInCommand {
@@ -174,6 +177,7 @@ public:
     void execute() override;
 private:
     JobsList::JobEntry* m_job;
+    JobsList* m_jobs;
     static const int FG_MAX_NUM_ARGS = 1;
 };
 
@@ -241,6 +245,7 @@ private:
     SmallShell();
     std::string m_smashPrompt;
     JobsList* jobs;
+    JobsList::JobEntry* m_foregroundJob;
     string m_lastPwd;
     string m_currPwd;
 
@@ -265,8 +270,12 @@ public:
     void setCurrDir(const string& dir);
     void setLastDir(const string& dir);
     JobsList* getJobsList() const;
+    JobsList::JobEntry* getForegroundJob() const;
+    void setForegroundJob(JobsList::JobEntry* jobEntry);
+//    pid_t getForegroundPid() const;
+//    void setForegroundPid(pid_t pid);
 
-  // TODO: add extra methods as needed
+    static const int RET_VALUE_ERROR = -1;
 };
 
 #endif //SMASH_COMMAND_H_
