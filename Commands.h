@@ -47,11 +47,9 @@ public:
 class ExternalCommand: public Command {
 public:
     explicit ExternalCommand(const char* cmd_line);
-    ~ExternalCommand() override;
+    ~ExternalCommand() override = default;
     void execute() override;
 private:
-    bool m_isBackground;
-    char* m_cmdWithoutBg;
 };
 
 //class PipeCommand : public Command {

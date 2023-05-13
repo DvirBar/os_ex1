@@ -459,12 +459,8 @@ void KillCommand::execute() {
 /* ----------------------------------------------- External Commands ------------------------------------------------- */
 
 ExternalCommand::ExternalCommand(const char *cmd_line) :
-        Command(cmd_line),
-        m_isBackground(_isBackgroundComamnd(cmd_line))
-{
-    m_cmdWithoutBg = strdup(cmd_line);
-    _removeBackgroundSign(m_cmdWithoutBg);
-}
+        Command(cmd_line)
+{}
 
 void ExternalCommand::execute() {
     string cmdlineStr = m_cmdLine;
@@ -473,8 +469,10 @@ void ExternalCommand::execute() {
         // TODO: Complex
         forkPid = fork();
         if(forkPid > 0) {
-            if(!m_isBackground) {
-                wait(nullptr);
+            if(!isBackground) {
+                if (waitpid(forkPid, nullptr, 0) == RET_VALUE_ERROR)
+                    throw SyscallException("waitpid");
+
             }
             else
                 SmallShell::getInstance().getJobsList()->addJob(this);
@@ -482,8 +480,9 @@ void ExternalCommand::execute() {
 
         else if(forkPid == 0) {
 
-            char* bashArgs[] = {(char*)"-c", m_cmdWithoutBg, nullptr};
-            execvp("/bin/bash", bashArgs);
+            char* bashArgs[] = {(char*)"-c", (char*)m_cmdLine, nullptr};
+            if(execvp("/bin/bash", bashArgs) == RET_VALUE_ERROR)
+                throw SyscallException("execvp");
         }
 
         else {
@@ -495,10 +494,6 @@ void ExternalCommand::execute() {
         // TODO: Simple
     }
 
-}
-
-ExternalCommand::~ExternalCommand() {
-    free(m_cmdWithoutBg);
 }
 
 /* ----------------------------------------------- Special Commands ------------------------------------------------- */
