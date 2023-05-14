@@ -1,9 +1,11 @@
 #include <unistd.h>
 #include <string.h>
 #include <iostream>
+#include <fcntl.h>
 #include <vector>
 #include <sstream>
 #include <sys/wait.h>
+#include <sys/stat.h>
 //#include <sys/sysinfo.h>
 #include <sched.h>
 #include <iomanip>
@@ -141,6 +143,11 @@ void SmallShell::setForegroundJob(JobsList::JobEntry *jobEntry) {
     m_foregroundJob = jobEntry;
 }
 
+void SmallShell::removeForegroundJob() {
+    delete m_foregroundJob;
+    m_foregroundJob = nullptr;
+}
+
 Command::Command(const char *cmd_line):
     m_rawCmdLine(cmd_line)
 {
@@ -159,6 +166,11 @@ Command::~Command() {
     for(int i=0; i<m_numArgs; i++) {
         ::free(m_args[i]);
     }
+}
+
+void Command::splitCommand(const string& str, const string& delimiter, string commands[2]) {
+    commands[0] = str.substr(0, str.find(delimiter));
+    commands[1] = str.substr(commands[0].length() + delimiter.length(), str.length());
 }
 
 bool Command::hasBackgroundSign(string cmd_line) {
@@ -183,51 +195,68 @@ BuiltInCommand::BuiltInCommand(const char *cmd_line):
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
 Command * SmallShell::CreateCommand(const char* cmd_line) {
-  string cmd_s = _trim(_removeBackgroundSign(cmd_line));
-  string commandStr = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
+    string cmdLineStr = string(cmd_line);
 
-  if (commandStr == "pwd") {
-    return new GetCurrDirCommand(cmd_line);
-  }
+    if(cmdLineStr.find('>') != string::npos) {
+        return new RedirectionCommand(cmd_line);
+    }
 
-  else if (commandStr == "showpid") {
-    return new ShowPidCommand(cmd_line);
-  }
+    if(cmdLineStr.find('|') != string::npos) {
+      return new PipeCommand(cmd_line);
+    }
 
-  else if(commandStr == "chprompt") {
-      return new ChangePromptCommand(cmd_line);
-  }
+    return findCommand(cmd_line);
+}
 
-  else if(commandStr == "cd") {
-      auto lastPwd = getInstance().getLastDir();
-      auto currPwd = getInstance().getCurrDir();
-      auto cdCom = new ChangeDirCommand(cmd_line, &lastPwd);
-      setLastDir(getCurrDir());
-      return cdCom;
-  }
+Command *SmallShell::findCommand(const char *cmd_line, bool isPipe) {
+    string cmd_s = _trim(_removeBackgroundSign(cmd_line));
+    string commandStr = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
 
-  else if(commandStr == "fg") {
-      return new ForegroundCommand(cmd_line, getJobsList());
-  }
+    if (commandStr == "pwd") {
+        return new GetCurrDirCommand(cmd_line);
+    }
 
-  else if(commandStr == "jobs") {
-      return new JobsCommand(cmd_line, getJobsList());
-  }
+    else if (commandStr == "showpid") {
+        return new ShowPidCommand(cmd_line);
+    }
 
-  else if(commandStr == "bg") {
-      return new BackgroundCommand(cmd_line, getJobsList());
-  }
+    else if(commandStr == "chprompt") {
+        return new ChangePromptCommand(cmd_line);
+    }
 
-  else if(commandStr == "quit") {
-      return new QuitCommand(cmd_line, getJobsList());
-  }
+    else if(commandStr == "cd") {
+        auto lastPwd = getInstance().getLastDir();
+        auto currPwd = getInstance().getCurrDir();
+        auto cdCom = new ChangeDirCommand(cmd_line, &lastPwd);
+        SmallShell::getInstance().setLastDir(SmallShell::getInstance().getCurrDir());
+        return cdCom;
+    }
 
-  else if(commandStr == "kill") {
-      return new KillCommand(cmd_line, getJobsList());
-  }
+    else if(commandStr == "fg") {
+        return new ForegroundCommand(cmd_line, SmallShell::getInstance().getJobsList());
+    }
 
- return new ExternalCommand(cmd_line);
+    else if(commandStr == "jobs") {
+        return new JobsCommand(cmd_line, SmallShell::getInstance().getJobsList());
+    }
 
+    else if(commandStr == "bg") {
+        return new BackgroundCommand(cmd_line, SmallShell::getInstance().getJobsList());
+    }
+
+    else if(commandStr == "quit") {
+        return new QuitCommand(cmd_line, SmallShell::getInstance().getJobsList());
+    }
+
+    else if(commandStr == "kill") {
+        return new KillCommand(cmd_line, SmallShell::getInstance().getJobsList());
+    }
+
+    else if(commandStr == "getfiletype") {
+        return new GetFileTypeCommand(cmd_line);
+    }
+
+    return new ExternalCommand(cmd_line, isPipe);
 }
 
 void SmallShell::executeCommand(const char *cmd_line) {
@@ -247,12 +276,12 @@ void SmallShell::executeCommand(const char *cmd_line) {
 
 
 ShowPidCommand::ShowPidCommand(const char *cmd_line):
-        BuiltInCommand(cmd_line)
+        BuiltInCommand(cmd_line),
+        m_pid(getpid())
 {}
 
 void ShowPidCommand::execute() {
-    int pid = getpid();
-    cout << "smash pid is " << pid << endl;
+    cout << "smash pid is " << m_pid << endl;
 }
 
 ChangePromptCommand::ChangePromptCommand(const char* cmd_line) :
@@ -418,6 +447,7 @@ QuitCommand::QuitCommand(const char *cmd_line, JobsList *jobs):
     }
 }
 
+// TODO: quit causes segfault when used with kill
 void QuitCommand::execute() {
     if(execKill) {
         cout << "sending SIGKILL signal to 3 jobs:" << endl;
@@ -469,14 +499,26 @@ void KillCommand::execute() {
 }
 
 /* ----------------------------------------------- External Commands ------------------------------------------------- */
-ExternalCommand::ExternalCommand(const char *cmd_line):
-        Command(cmd_line)
-{}
+ExternalCommand::ExternalCommand(const char *cmd_line, bool isPipe):
+        Command(cmd_line),
+        isPipe(isPipe)
+{
+    string cmdlineStr = m_cmdLine;
+    if(cmdlineStr.find('*') != string::npos || cmdlineStr.find('?') != string::npos) {
+        isSimple = false;
+    } else {
+        isSimple = true;
+    }
+}
 
 void ExternalCommand::execute() {
     string cmdlineStr = m_cmdLine;
     int forkPid = 0;
-    if(cmdlineStr.find('*') != string::npos || cmdlineStr.find('?') != string::npos) {
+    if(!isSimple) {
+        if(isPipe) {
+            execComplexChild();
+            return;
+        }
         forkPid = fork();
         if(forkPid > 0) {
             if(!m_isBackground) {
@@ -487,8 +529,7 @@ void ExternalCommand::execute() {
         }
 
         else if(forkPid == 0) {
-            char* bashArgs[] = {(char*)"-c", (char*)m_rawCmdLine, nullptr};
-            execvp("/bin/bash", bashArgs);
+            execComplexChild();
         }
 
         else {
@@ -497,27 +538,30 @@ void ExternalCommand::execute() {
     }
 
     else {
-        execSimpleCommand(m_args, m_isBackground, this);
+        if(isPipe) {
+            execSimpleChild();
+            return;
+        }
+        execSimpleCommand();
     }
 
 }
 
-void ExternalCommand::execSimpleCommand(char* args[Command::CMD_MAX_NUM_ARGS+1], bool isBackground, Command* cmd) {
+void ExternalCommand::execSimpleCommand() {
     pid_t pid = fork();
     // Child process
     if(pid == 0) {
-        string filename = string("/bin/") + string(args[0]);
-        execv(filename.c_str(), args);
+        execSimpleChild();
     }
-
+    // Parent process
     else if(pid > 0) {
-        if(!isBackground) {
-            auto jobEntry = new JobsList::JobEntry(0, pid, cmd->getCmdLine(), false);
+        if(!m_isBackground) {
+            auto jobEntry = new JobsList::JobEntry(0, pid, getCmdLine(), false);
             SmallShell::getInstance().setForegroundJob(jobEntry);
             waitpid(pid, nullptr, 0);
-            SmallShell::getInstance().setForegroundJob(nullptr);
+            SmallShell::getInstance().removeForegroundJob();
         } else {
-            SmallShell::getInstance().getJobsList()->addJob(cmd->getCmdLine(), pid);
+            SmallShell::getInstance().getJobsList()->addJob(getCmdLine(), pid);
         }
     }
 
@@ -526,9 +570,114 @@ void ExternalCommand::execSimpleCommand(char* args[Command::CMD_MAX_NUM_ARGS+1],
     }
 }
 
+void ExternalCommand::execComplexChild() {
+    char* bashArgs[] = {(char*)"-c", (char*)m_cmdLine, nullptr};
+    execvp("/bin/bash", bashArgs);
+}
+
+void ExternalCommand::execSimpleChild() {
+    string filename = string("/bin/") + string(m_args[0]);
+    execv(filename.c_str(), m_args);
+}
+
 
 
 /* ----------------------------------------------- Special Commands ------------------------------------------------- */
+
+RedirectionCommand::RedirectionCommand(const char *cmd_line):
+    Command(cmd_line)
+{
+    string delimiter;
+    if(string(cmd_line).find(">>") != string::npos) {
+        delimiter = ">>";
+        m_overrideContent = true;
+    } else {
+        delimiter = ">";
+        m_overrideContent = false;
+    }
+
+    string commands[2];
+    Command::splitCommand(string(cmd_line), delimiter, commands);
+    m_cmd = SmallShell::findCommand(commands[0].c_str(), true);
+    m_fileName = commands[1];
+}
+
+void RedirectionCommand::execute() {
+    int pid = fork();
+    if(pid == 0) {
+    // Close stdout fd so that when we open a file it will point the file object
+        close(1);
+        // TODO: should i close  the file?
+        open(m_fileName.c_str(), O_CREAT, 655);
+        m_cmd->execute();
+        exit(0);
+    } else if(pid < 0) {
+        throw SyscallException("fork");
+    }
+
+    waitpid(pid, nullptr, 0);
+}
+
+PipeCommand::PipeCommand(const char *cmd_line):
+    Command(cmd_line)
+{
+    string delimiter;
+    if(string(cmd_line).find("|&") != string::npos) {
+        delimiter = "|&";
+        m_useStderr = true;
+    } else {
+        delimiter = "|";
+        m_useStderr = false;
+    }
+
+    string commands[2];
+    Command::splitCommand(string(cmd_line), delimiter, commands);
+    m_src = SmallShell::findCommand(commands[0].c_str(), true);
+    m_dest = SmallShell::findCommand(commands[1].c_str(), true);
+}
+
+void PipeCommand::execute() {
+    int fd[2];
+    pipe(fd);
+    int pipeOut = 1;
+    if(m_useStderr) {
+        pipeOut = 2;
+    }
+
+    int srcPid = fork();
+    if(srcPid == 0) {
+        // Map stdout to pipe write
+        dup2(fd[1], pipeOut);
+        safeClose(fd[0]);
+        safeClose(fd[1]);
+        m_src->execute();
+        ::exit(0); // We exit because builtin commands don't use execv and will return from execute
+    } else if(srcPid < 0) {
+        throw SyscallException("fork");
+    }
+
+    int destPid = fork();
+    if(destPid == 0) {
+        // Map stdin to pipe read
+        dup2(fd[0], 0);
+        safeClose(fd[0]);
+        safeClose(fd[1]);
+        m_dest->execute();
+        ::exit(0);
+    } else if(destPid < 0) {
+        throw SyscallException("fork");
+    }
+    waitpid(srcPid, nullptr, 0);
+    waitpid(destPid, nullptr, 0);
+    safeClose(fd[0]);
+    safeClose(fd[1]);
+}
+
+void PipeCommand::safeClose(int fd) {
+    if(close(fd) < 0) {
+        throw SyscallException("close");
+    }
+}
 
 //SetcoreCommand::SetcoreCommand(const char *cmd_line, JobsList* jobs) :
 //    BuiltInCommand(cmd_line)
@@ -566,6 +715,78 @@ void ExternalCommand::execSimpleCommand(char* args[Command::CMD_MAX_NUM_ARGS+1],
 //        throw SyscallException("sched_setaffinity");
 //    }
 //}
+
+GetFileTypeCommand::GetFileTypeCommand(const char *cmd_line):
+    BuiltInCommand(cmd_line)
+{
+    if(m_numArgs != NUM_ARGS) {
+        throw FileTypeInvalidArgs();
+    }
+
+    fileName = m_args[1];
+}
+
+void GetFileTypeCommand::execute() {
+    auto statBuffer = (struct stat*)::malloc(sizeof(struct stat));
+    int retValue = stat(fileName.c_str(), statBuffer);
+    if(retValue) {
+        throw SyscallException("stat");
+    }
+
+    string fileType;
+    switch(statBuffer->st_mode & S_IFMT) {
+        case S_IFBLK:
+            fileType = "block device";
+            break;
+        case S_IFCHR:
+            fileType = "character device";
+            break;
+        case S_IFDIR:
+            fileType = "directory";
+            break;
+        case S_IFIFO:
+            fileType =  "FIFO";
+            break;
+        case S_IFLNK:
+            fileType = "symbolic link";
+            break;
+        case S_IFREG:
+            fileType = "regular file";
+            break;
+        case S_IFSOCK:
+            fileType = "socket";
+            break;
+        default:
+            fileType = "";
+    }
+
+    cout << fileName << "'s type is \"" + fileType + "\" and takes up " + to_string(statBuffer->st_size) + " bytes" << endl;
+    free(statBuffer);
+}
+
+
+// Timeout with redirection?
+TimeoutCommand::TimeoutCommand(const char *cmd_line):
+    BuiltInCommand(cmd_line)
+{
+    string command;
+    for(int i=2; i<m_numArgs+1; i++) {
+        command = string(m_args[i]);
+        if(i < m_numArgs) {
+            command += " ";
+        }
+    }
+
+    stringstream secsStr;
+    secsStr << m_args[1];
+    secsStr >> m_secs;
+
+    m_cmd = SmallShell::findCommand(command.c_str());
+}
+
+void TimeoutCommand::execute() {
+    alarm(m_secs);
+}
 
 
 

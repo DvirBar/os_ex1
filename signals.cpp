@@ -40,6 +40,7 @@ void ctrlCHandler(int sig_num) {
 }
 
 void alarmHandler(int sig_num) {
-  // TODO: Add your implementation
+    cout << "smash: got an alarm" << endl;
+
 }
 

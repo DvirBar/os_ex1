@@ -21,6 +21,8 @@ public:
   //virtual void cleanup();
     const char* getCmdLine() const;
 
+    static void splitCommand(const string& str, const string& delimiter, string commands[2]);
+
     static const int MAX_COMMAND_SIZE = 80;
     static const int CMD_MAX_NUM_ARGS = 20;
 
@@ -46,31 +48,46 @@ public:
 
 class ExternalCommand: public Command {
  public:
-  explicit ExternalCommand(const char* cmd_line);
+  explicit ExternalCommand(const char* cmd_line, bool isPipe);
   virtual ~ExternalCommand() = default;
   void execute() override;
 
 private:
-    static void execSimpleCommand(char* m_args[Command::CMD_MAX_NUM_ARGS+1], bool isBackground, Command* cmd);
+    bool isSimple;
+    bool isPipe;
+
+    void execSimpleCommand();
+    void execComplexChild();
+    void execSimpleChild();
 };
 
-//class PipeCommand : public Command {
-//  // TODO: Add your data members
-// public:
-//  explicit PipeCommand(const char* cmd_line);
-//  virtual ~PipeCommand() {}
-//  void execute() override;
-//};
 
-//class RedirectionCommand: public Command {
-// // TODO: Add your data members
-// public:
-//  explicit RedirectionCommand(const char* cmd_line);
-//  virtual ~RedirectionCommand() {}
-//  void execute() override;
-//  //void prepare() override;
-//  //void cleanup() override;
-//};
+class PipeCommand : public Command {
+ public:
+  explicit PipeCommand(const char* cmd_line);
+  virtual ~PipeCommand() {}
+  void execute() override;
+private:
+    static void safeClose(int fd);
+
+    Command* m_src;
+    Command* m_dest;
+    bool m_useStderr;
+};
+
+class RedirectionCommand: public Command {
+ public:
+  explicit RedirectionCommand(const char* cmd_line);
+  virtual ~RedirectionCommand() {}
+  void execute() override;
+  //void prepare() override;
+  //void cleanup() override;
+
+private:
+    bool m_overrideContent;
+    Command* m_cmd;
+    string m_fileName;
+};
 
 class ChangePromptCommand: public BuiltInCommand {
 public:
@@ -105,6 +122,8 @@ public:
     explicit ShowPidCommand(const char* cmd_line);
     ~ShowPidCommand() override = default;
     void execute() override;
+private:
+    pid_t m_pid;
 };
 
 class JobsList;
@@ -192,15 +211,16 @@ private:
     static const int BG_MAX_NUM_ARGS = 2;
 };
 
-//class TimeoutCommand : public BuiltInCommand {
-///* Bonus */
-//// TODO: Add your data members
-// public:
-//  explicit TimeoutCommand(const char* cmd_line);
-//  virtual ~TimeoutCommand() {}
-//  void execute() override;
-//};
-//
+class TimeoutCommand : public BuiltInCommand {
+public:
+    explicit TimeoutCommand(const char* cmd_line);
+    virtual ~TimeoutCommand() {}
+    void execute() override;
+private:
+    Command* m_cmd;
+    unsigned int m_secs;
+};
+
 //class ChmodCommand : public BuiltInCommand {
 //  // TODO: Add your data members
 // public:
@@ -209,13 +229,15 @@ private:
 //  void execute() override;
 //};
 
-//class GetFileTypeCommand : public BuiltInCommand {
-//  // TODO: Add your data members
-// public:
-//  GetFileTypeCommand(const char* cmd_line);
-//  virtual ~GetFileTypeCommand() {}
-//  void execute() override;
-//};
+class GetFileTypeCommand : public BuiltInCommand {
+ public:
+  GetFileTypeCommand(const char* cmd_line);
+  virtual ~GetFileTypeCommand() {}
+  void execute() override;
+private:
+    string fileName;
+    static const int NUM_ARGS = 1;
+};
 
 class SetcoreCommand : public BuiltInCommand {
   // TODO: Add your data members
@@ -272,8 +294,9 @@ public:
     JobsList* getJobsList() const;
     JobsList::JobEntry* getForegroundJob() const;
     void setForegroundJob(JobsList::JobEntry* jobEntry);
-//    pid_t getForegroundPid() const;
-//    void setForegroundPid(pid_t pid);
+    void removeForegroundJob();
+
+    static Command* findCommand(const char* cmd_line, bool isPipe = false);
 
     static const int RET_VALUE_ERROR = -1;
 };
