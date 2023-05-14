@@ -391,7 +391,7 @@ void ForegroundCommand::execute() {
 
         m_jobs->removeJobById(m_job->getJobId());
     }
-
+    cout << "Fg" << endl;
     if(waitpid(m_job->getPid(), nullptr, 0) == RET_VALUE_ERROR) {
         throw SyscallException("waitpid");
     }
@@ -558,7 +558,9 @@ void ExternalCommand::execSimpleCommand() {
         if(!m_isBackground) {
             auto jobEntry = new JobsList::JobEntry(0, pid, getCmdLine(), false);
             SmallShell::getInstance().setForegroundJob(jobEntry);
-            waitpid(pid, nullptr, 0);
+            if(waitpid(pid, nullptr, 0) == RET_VALUE_ERROR) {
+                throw SyscallException("waitpid");
+            }
             SmallShell::getInstance().removeForegroundJob();
         } else {
             SmallShell::getInstance().getJobsList()->addJob(getCmdLine(), pid);
@@ -577,7 +579,10 @@ void ExternalCommand::execComplexChild() {
 
 void ExternalCommand::execSimpleChild() {
     string filename = string("/bin/") + string(m_args[0]);
-    execv(filename.c_str(), m_args);
+    int retValue = execv(filename.c_str(), m_args);
+    if(retValue == RET_VALUE_ERROR) {
+        throw SyscallException("execv");
+    }
 }
 
 
@@ -614,7 +619,7 @@ void RedirectionCommand::execute() {
     } else if(pid < 0) {
         throw SyscallException("fork");
     }
-
+    cout << "redirections" << endl;
     waitpid(pid, nullptr, 0);
 }
 
@@ -667,6 +672,7 @@ void PipeCommand::execute() {
     } else if(destPid < 0) {
         throw SyscallException("fork");
     }
+    cout << "pipes" << endl;
     waitpid(srcPid, nullptr, 0);
     waitpid(destPid, nullptr, 0);
     safeClose(fd[0]);
@@ -905,7 +911,9 @@ void JobsList::removeFinishedJobs() {
     if(jobs.empty()) {
         return;
     }
+
     for (auto it = jobs.begin(); it->first != jobs.end()->first;) {
+        cout << "remove" << endl;
         waitpidCheck = waitpid(it->second->getPid(), &status, WNOHANG);
         if(waitpidCheck > 0) {
             removeJobById(it->first);
