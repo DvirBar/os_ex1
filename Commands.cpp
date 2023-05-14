@@ -145,7 +145,7 @@ void SmallShell::setForegroundJob(JobsList::JobEntry *jobEntry) {
 Command::Command(const char *cmd_line):
     m_rawCmdLine(cmd_line)
 {
-    m_cmdLine = _removeBackgroundSign(cmd_line).c_str();
+    m_cmdLine = _trim(_removeBackgroundSign(cmd_line)).c_str();
     int numArgs = _parseCommandLine(m_cmdLine, m_args)-1;
     this->m_numArgs = numArgs;
 

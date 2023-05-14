@@ -189,7 +189,7 @@ public:
     void execute() override;
 private:
     JobsList::JobEntry* m_bgJob;
-    static const int BG_MAX_NUM_ARGS = 2;
+    static const int BG_MAX_NUM_ARGS = 1;
 };
 
 //class TimeoutCommand : public BuiltInCommand {
@@ -240,7 +240,7 @@ public:
 private:
     JobsList::JobEntry* m_killJob;
     int m_sig;
-    static const int KILL_NUM_ARGS = 3;
+    static const int KILL_NUM_ARGS = 2;
     static const char KILL_SIGNAL_PREFIX = '-';
 };
 
