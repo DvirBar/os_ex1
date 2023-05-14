@@ -201,13 +201,17 @@ private:
 //  void execute() override;
 //};
 //
-//class ChmodCommand : public BuiltInCommand {
-//  // TODO: Add your data members
-// public:
-//  ChmodCommand(const char* cmd_line);
-//  virtual ~ChmodCommand() {}
-//  void execute() override;
-//};
+class ChmodCommand : public BuiltInCommand {
+public:
+    explicit ChmodCommand(const char* cmd_line);
+    ~ChmodCommand() override = default;
+    void execute() override;
+private:
+    mode_t m_mode;
+    const char* m_path;
+    const int CHMOD_NUM_ARGS = 2;
+
+};
 
 //class GetFileTypeCommand : public BuiltInCommand {
 //  // TODO: Add your data members
