@@ -247,7 +247,12 @@ void SmallShell::executeCommand(const char *cmd_line) {
         delete cmd;
     }
     catch (const SyscallException& error) {
-        ::perror(error.what());
+        if(error.m_fromChild) {
+            ::perror(error.what());
+            exit(0);
+        }
+        else
+            ::perror(error.what());
     } catch(const exception& error) {
         cerr << error.what() << endl;
     }
@@ -501,9 +506,11 @@ void ExternalCommand::execute() {
         }
 
         else if(forkPid == 0) {
+            setpgrp();
             char* bashArgs[] = {(char*)"-c", (char*)m_cmdLine, nullptr};
             if(execvp("/bin/bash", bashArgs) == RET_VALUE_ERROR)
-                throw SyscallException("execvp");
+                throw SyscallException("execvp", true);
+            exit(0);
         }
 
         else {
@@ -521,8 +528,11 @@ void ExternalCommand::execSimpleCommand(char* args[Command::CMD_MAX_NUM_ARGS+1],
     pid_t pid = fork();
     // Child process
     if(pid == 0) {
-        string filename = string("/bin/") + string(args[0]);
-        execv(filename.c_str(), args);
+        setpgrp();
+        if(execvp(args[0], args) == RET_VALUE_ERROR) {
+            throw SyscallException("execvp", true);
+        }
+        exit(0);
     }
 
     else if(pid > 0) {

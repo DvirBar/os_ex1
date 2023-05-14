@@ -119,13 +119,15 @@ private:
 // SyscallException
 class SyscallException: public exception {
 public:
-    explicit SyscallException(const char* syscallName) :
+    explicit SyscallException(const char* syscallName, bool fromChild = false) :
+        m_fromChild(fromChild),
         m_syscallName(syscallName),
         m_errorStr("smash error: " + m_syscallName + " failed")
     {}
     const char* what() const noexcept override {
         return m_errorStr.c_str();
     }
+    bool m_fromChild;
 private:
     std::string m_syscallName;
     std::string m_errorStr;
