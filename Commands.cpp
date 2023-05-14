@@ -559,6 +559,7 @@ void ExternalCommand::execSimpleCommand() {
             auto jobEntry = new JobsList::JobEntry(0, pid, getCmdLine(), false);
             SmallShell::getInstance().setForegroundJob(jobEntry);
             if(waitpid(pid, nullptr, 0) == RET_VALUE_ERROR) {
+                SmallShell::getInstance().removeForegroundJob();
                 throw SyscallException("waitpid");
             }
             SmallShell::getInstance().removeForegroundJob();
@@ -578,10 +579,9 @@ void ExternalCommand::execComplexChild() {
 }
 
 void ExternalCommand::execSimpleChild() {
-    string filename = string("/bin/") + string(m_args[0]);
-    int retValue = execv(filename.c_str(), m_args);
+    int retValue = execvp(m_args[0], m_args);
     if(retValue == RET_VALUE_ERROR) {
-        throw SyscallException("execv");
+        throw SyscallException("execvp");
     }
 }
 
