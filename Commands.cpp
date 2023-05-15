@@ -647,7 +647,6 @@ void RedirectionCommand::execute() {
     } else if(pid < 0) {
         throw SyscallException("fork");
     }
-    cout << "redirections" << endl;
     waitpid(pid, nullptr, 0);
 }
 
@@ -700,7 +699,6 @@ void PipeCommand::execute() {
     } else if(destPid < 0) {
         throw SyscallException("fork");
     }
-    cout << "pipes" << endl;
     waitpid(srcPid, nullptr, 0);
     waitpid(destPid, nullptr, 0);
     safeClose(fd[0]);
@@ -855,6 +853,7 @@ JobsList::~JobsList() {
 }
 
 void JobsList::addJob(const char* rawCmdLine, pid_t pid, bool isStopped) {
+    removeFinishedJobs();
     int jobId = assignJobId(jobs);
     auto jobEntry = new JobEntry(jobId, pid, rawCmdLine, isStopped);
     jobs.insert({jobId, jobEntry});
@@ -874,10 +873,6 @@ int JobsList::assignJobId(map<int, JobEntry*> jobs) {
     if(shouldDelete) {
         delete jobEntry;
     }
-
-    for(auto job: jobs) {
-        job.second->print(true);
-    }
 }
 
 JobsList::JobEntry* JobsList::getJobById(int jobId) {
@@ -890,7 +885,8 @@ JobsList::JobEntry* JobsList::getJobById(int jobId) {
     return jobIterator->second;
 }
 
-
+// TODO: should the clock keep going if job is stopped?
+// TODO: should continue job if SIGCONT was sent
 
 bool JobsList::isEmpty() const {
     return jobs.empty();
@@ -972,7 +968,9 @@ void JobsList::removeFinishedJobs() {
     for (auto it = jobs.begin(); it->first != jobs.end()->first;) {
         waitpidCheck = waitpid(it->second->getPid(), &status, WNOHANG);
         if(waitpidCheck > 0) {
-            removeJobById(it->first);
+            JobEntry* jobEntry = getJobById(it->first);
+            it = jobs.erase(it);
+            delete jobEntry;
         }
         else if(waitpidCheck == RET_VALUE_ERROR) {
             throw SyscallException("waitpid");

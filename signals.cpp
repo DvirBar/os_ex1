@@ -12,7 +12,6 @@ void ctrlZHandler(int sig_num) {
     auto foreJob = SmallShell::getInstance().getForegroundJob();
     if(foreJob != nullptr) {
         pid_t runningPid = foreJob->getPid();
-        foreJob->print(true);
         SmallShell::getInstance().getJobsList()->addJob(foreJob->getCmdLine().c_str(), runningPid, true);
         if(kill(runningPid, SIGSTOP) == SmallShell::RET_VALUE_ERROR) {
             throw SyscallException("kill");
