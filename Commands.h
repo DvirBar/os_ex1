@@ -164,7 +164,7 @@ public:
  public:
     JobsList() = default;
     ~JobsList();
-    void addJob(const char* rawCmdLine, pid_t pid, bool isStopped = false);
+    void addJob(const char* rawCmdLine, pid_t pid, int jobId, bool isStopped = false);
     void printJobsList();
     void killAllJobs();
     void removeFinishedJobs();
@@ -174,6 +174,7 @@ public:
     JobEntry *getLastStoppedJob();
     int getMaxJobId() const;
     bool isEmpty() const;
+    ::size_t getNumJobs() const;
 //  JobEntry* getJobById(char* jobId) const;
 
 private:

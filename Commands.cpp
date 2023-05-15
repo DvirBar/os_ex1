@@ -348,7 +348,7 @@ ChangeDirCommand::ChangeDirCommand(const char *cmd_line, string* plastPwd):
         m_targetPwd = arg;
     }
 }
-
+// TODO: fix
 void ChangeDirCommand::execute() {
     int retValue = chdir(m_targetPwd.c_str());
     if(retValue == RET_VALUE_ERROR) {
@@ -468,7 +468,7 @@ QuitCommand::QuitCommand(const char *cmd_line, JobsList *jobs):
 // TODO: quit causes segfault when used with kill
 void QuitCommand::execute() {
     if(execKill) {
-        cout << "sending SIGKILL signal to 3 jobs:" << endl;
+        cout << "sending SIGKILL signal to " << m_jobs->getNumJobs() << " jobs:" << endl;
         m_jobs->killAllJobs();
     }
 
@@ -510,6 +510,10 @@ void KillCommand::execute() {
         m_killJob->stopJob();
     }
 
+    if(m_sig == SIGCONT) {
+        m_killJob->continueJob();
+    }
+
     if(kill(pid, m_sig) == RET_VALUE_ERROR) {
         throw SyscallException("kill");
     }
@@ -549,7 +553,7 @@ void ExternalCommand::execute() {
                 SmallShell::getInstance().setForegroundJob(nullptr);
             }
             else
-                SmallShell::getInstance().getJobsList()->addJob(this->m_rawCmdLine, forkPid);
+                SmallShell::getInstance().getJobsList()->addJob(this->m_rawCmdLine, forkPid, 0);
         }
 
         else if(forkPid == 0) {
@@ -590,7 +594,7 @@ void ExternalCommand::execSimpleCommand() {
             }
             SmallShell::getInstance().removeForegroundJob();
         } else {
-            SmallShell::getInstance().getJobsList()->addJob(getCmdLine(), pid);
+            SmallShell::getInstance().getJobsList()->addJob(getCmdLine(), pid, 0);
         }
     }
 
@@ -852,9 +856,12 @@ JobsList::~JobsList() {
     }
 }
 
-void JobsList::addJob(const char* rawCmdLine, pid_t pid, bool isStopped) {
+void JobsList::addJob(const char* rawCmdLine, pid_t pid, int jobId, bool isStopped) {
     removeFinishedJobs();
-    int jobId = assignJobId(jobs);
+    if(jobId == 0) {
+        jobId = assignJobId(jobs);
+    }
+
     auto jobEntry = new JobEntry(jobId, pid, rawCmdLine, isStopped);
     jobs.insert({jobId, jobEntry});
 }
@@ -1002,9 +1009,12 @@ JobsList::JobEntry*  JobsList::getLastStoppedJob() {
 }
 
 void JobsList::killAllJobs() {
-    for(auto job: jobs) {
-        job.second->print(false, false);
+    for (auto job: jobs) {
+        cout << job.second->getPid() << ": " << job.second->getCmdLine() << endl;
         kill(job.second->getPid(), SIGKILL);
-        removeJobById(job.first);
     }
+}
+
+::size_t JobsList::getNumJobs() const {
+    return jobs.size();
 }
