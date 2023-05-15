@@ -4,7 +4,7 @@
 #include <vector>
 #include <sstream>
 #include <sys/wait.h>
-#include <sys/sysinfo.h>
+//#include <sys/sysinfo.h>
 #include <sys/stat.h>
 #include <sched.h>
 #include <iomanip>
@@ -226,10 +226,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
   else if(commandStr == "kill") {
       return new KillCommand(cmd_line, getJobsList());
   }
-
-  else if(commandStr == "setcore") {
-      return new SetcoreCommand(cmd_line, getJobsList());
-  }
+//
+//  else if(commandStr == "setcore") {
+//      return new SetcoreCommand(cmd_line, getJobsList());
+//  }
 
   else if(commandStr == "chmod") {
       return new ChmodCommand(cmd_line);
@@ -539,8 +539,9 @@ void ExternalCommand::execSimpleCommand(char* args[Command::CMD_MAX_NUM_ARGS+1],
         if(!isBackground) {
             auto jobEntry = new JobsList::JobEntry(0, pid, cmd->getCmdLine(), false);
             SmallShell::getInstance().setForegroundJob(jobEntry);
-            waitpid(pid, nullptr, 0);
-            SmallShell::getInstance().setForegroundJob(nullptr);
+            if(waitpid(pid, nullptr, 0) == RET_VALUE_ERROR) {
+                SmallShell::getInstance().setForegroundJob(nullptr);
+            }
         } else {
             SmallShell::getInstance().getJobsList()->addJob(cmd->getCmdLine(), pid);
         }
@@ -555,42 +556,42 @@ void ExternalCommand::execSimpleCommand(char* args[Command::CMD_MAX_NUM_ARGS+1],
 
 /* ----------------------------------------------- Special Commands ------------------------------------------------- */
 
-SetcoreCommand::SetcoreCommand(const char *cmd_line, JobsList* jobs) :
-    BuiltInCommand(cmd_line)
-{
-    int requestedJobId = 0;
-    int requestedCore = 0;
-
-    try {
-        if(m_numArgs == Command::NO_ARGS) {
-            throw SetCoreInvalidArguments();
-        }
-        requestedJobId = stoi(m_args[1]);
-        requestedCore = stoi(m_args[2]);
-        m_setCoreJob = jobs->getJobById(requestedJobId);
-        if(requestedCore >= get_nprocs() || requestedCore < 0) {
-            throw SetCoreInvalidCoreError();
-        }
-        m_core = requestedCore;
-    }
-
-    catch (invalid_argument& invalidArgument) {
-        throw SetCoreInvalidArguments();
-    }
-
-    catch (JobNotFoundError& jobNotFoundError) {
-        throw SetCoreJobNotFoundError(requestedJobId);
-    }
-}
-
-void SetcoreCommand::execute() {
-    cpu_set_t jobCPUMask;
-    CPU_ZERO(&jobCPUMask);
-    CPU_SET(m_core, &jobCPUMask);
-    if(sched_setaffinity(m_setCoreJob->getPid(), sizeof(jobCPUMask), &jobCPUMask) == RET_VALUE_ERROR) {
-        throw SyscallException("sched_setaffinity");
-    }
-}
+//SetcoreCommand::SetcoreCommand(const char *cmd_line, JobsList* jobs) :
+//    BuiltInCommand(cmd_line)
+//{
+//    int requestedJobId = 0;
+//    int requestedCore = 0;
+//
+//    try {
+//        if(m_numArgs == Command::NO_ARGS) {
+//            throw SetCoreInvalidArguments();
+//        }
+//        requestedJobId = stoi(m_args[1]);
+//        requestedCore = stoi(m_args[2]);
+//        m_setCoreJob = jobs->getJobById(requestedJobId);
+//        if(requestedCore >= get_nprocs() || requestedCore < 0) {
+//            throw SetCoreInvalidCoreError();
+//        }
+//        m_core = requestedCore;
+//    }
+//
+//    catch (invalid_argument& invalidArgument) {
+//        throw SetCoreInvalidArguments();
+//    }
+//
+//    catch (JobNotFoundError& jobNotFoundError) {
+//        throw SetCoreJobNotFoundError(requestedJobId);
+//    }
+//}
+//
+//void SetcoreCommand::execute() {
+//    cpu_set_t jobCPUMask;
+//    CPU_ZERO(&jobCPUMask);
+//    CPU_SET(m_core, &jobCPUMask);
+//    if(sched_setaffinity(m_setCoreJob->getPid(), sizeof(jobCPUMask), &jobCPUMask) == RET_VALUE_ERROR) {
+//        throw SyscallException("sched_setaffinity");
+//    }
+//}
 
 ChmodCommand::ChmodCommand(const char *cmd_line) :
     BuiltInCommand(cmd_line)
