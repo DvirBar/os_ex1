@@ -551,6 +551,7 @@ void ExternalCommand::execSimpleCommand() {
     pid_t pid = fork();
     // Child process
     if(pid == 0) {
+        setpgrp();
         execSimpleChild();
     }
     // Parent process
@@ -558,7 +559,7 @@ void ExternalCommand::execSimpleCommand() {
         if(!m_isBackground) {
             auto jobEntry = new JobsList::JobEntry(0, pid, getCmdLine(), false);
             SmallShell::getInstance().setForegroundJob(jobEntry);
-            if(waitpid(pid, nullptr, 0) == RET_VALUE_ERROR) {
+            if(waitpid(pid, nullptr, 0) == RET_VALUE_ERROR ) {
                 SmallShell::getInstance().removeForegroundJob();
                 throw SyscallException("waitpid");
             }
@@ -913,7 +914,6 @@ void JobsList::removeFinishedJobs() {
     }
 
     for (auto it = jobs.begin(); it->first != jobs.end()->first;) {
-        cout << "remove" << endl;
         waitpidCheck = waitpid(it->second->getPid(), &status, WNOHANG);
         if(waitpidCheck > 0) {
             removeJobById(it->first);
