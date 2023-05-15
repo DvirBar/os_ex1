@@ -12,11 +12,10 @@ void ctrlZHandler(int sig_num) {
     auto foreJob = SmallShell::getInstance().getForegroundJob();
     if(foreJob != nullptr) {
         pid_t runningPid = foreJob->getPid();
-        SmallShell::getInstance().getJobsList()->addJob(foreJob->getCmdLine().c_str(), runningPid, foreJob->getJobId(), true);
         if(kill(runningPid, SIGSTOP) == SmallShell::RET_VALUE_ERROR) {
             throw SyscallException("kill");
         }
-
+        SmallShell::getInstance().getJobsList()->addJob(foreJob->getCmdLine().c_str(), runningPid, foreJob->getJobId(), true);
         SmallShell::getInstance().removeForegroundJob();
         cout << "smash: process " << runningPid << " was stopped" << endl;
     }

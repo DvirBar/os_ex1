@@ -152,7 +152,7 @@ void SmallShell::removeForegroundJob() {
 Command::Command(const char *cmd_line):
     m_rawCmdLine(cmd_line)
 {
-    m_cmdLine = _trim(_removeBackgroundSign(cmd_line)).c_str();
+    m_cmdLine = _removeBackgroundSign(cmd_line).c_str();
     int numArgs = _parseCommandLine(m_cmdLine, m_args)-1;
     this->m_numArgs = numArgs;
 
@@ -557,6 +557,7 @@ void ExternalCommand::execute() {
         }
 
         else if(forkPid == 0) {
+            setpgrp();
             execComplexChild();
         }
 
@@ -588,7 +589,7 @@ void ExternalCommand::execSimpleCommand() {
             auto jobEntry = new JobsList::JobEntry(0, pid, getCmdLine(), false);
             SmallShell::getInstance().setForegroundJob(jobEntry);
 
-            if(waitpid(pid, nullptr, 0) == RET_VALUE_ERROR ) {
+            if(waitpid(pid, nullptr, WUNTRACED) == RET_VALUE_ERROR ) {
                 SmallShell::getInstance().removeForegroundJob();
                 throw SyscallException("waitpid");
             }
@@ -642,6 +643,7 @@ RedirectionCommand::RedirectionCommand(const char *cmd_line):
 void RedirectionCommand::execute() {
     int pid = fork();
     if(pid == 0) {
+        setpgrp();
     // Close stdout fd so that when we open a file it will point the file object
         close(1);
         // TODO: should i close  the file?
@@ -682,6 +684,7 @@ void PipeCommand::execute() {
 
     int srcPid = fork();
     if(srcPid == 0) {
+        setpgrp();
         // Map stdout to pipe write
         dup2(fd[1], pipeOut);
         safeClose(fd[0], true);
@@ -694,6 +697,7 @@ void PipeCommand::execute() {
 
     int destPid = fork();
     if(destPid == 0) {
+        setpgrp();
         // Map stdin to pipe read
         dup2(fd[0], 0);
         safeClose(fd[0], true);
@@ -781,9 +785,9 @@ GetFileTypeCommand::GetFileTypeCommand(const char *cmd_line):
 
 void GetFileTypeCommand::execute() {
     auto statBuffer = (struct stat*)::malloc(sizeof(struct stat));
-    int retValue = stat(fileName.c_str(), statBuffer);
+    int retValue = lstat(fileName.c_str(), statBuffer);
     if(retValue) {
-        throw SyscallException("stat");
+        throw SyscallException("lstat");
     }
 
     string fileType;
