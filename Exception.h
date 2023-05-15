@@ -116,6 +116,13 @@ private:
     std::string m_errorStr;
 };
 
+class FileTypeInvalidArgs: public exception {
+public:
+    const char* what() const noexcept override {
+        return "smash error: gettype: invalid arguments";
+    }
+};
+
 // SyscallException
 class SyscallException: public exception {
 public:
