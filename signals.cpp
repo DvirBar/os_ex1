@@ -15,7 +15,8 @@ void ctrlZHandler(int sig_num) {
         if(kill(runningPid, SIGSTOP) == SmallShell::RET_VALUE_ERROR) {
             throw SyscallException("kill");
         }
-        SmallShell::getInstance().getJobsList()->addJob(foreJob->getCmdLine().c_str(), runningPid, foreJob->getJobId(), true);
+        SmallShell::getInstance().getJobsList()->addJob(foreJob->getCmdLine().c_str(), runningPid, foreJob->getJobId(),
+                                                        true, foreJob->getTimeout());
         SmallShell::getInstance().removeForegroundJob();
         cout << "smash: process " << runningPid << " was stopped" << endl;
     }
@@ -40,5 +41,17 @@ void ctrlCHandler(int sig_num) {
 
 void alarmHandler(int sig_num) {
     cout << "smash: got an alarm" << endl;
+    JobsList::JobEntry* foreJob = SmallShell::getInstance().getForegroundJob();
+    if(foreJob != nullptr && foreJob->isTimedOut()) {
+        if(kill(foreJob->getPid(), SIGKILL) == SmallShell::RET_VALUE_ERROR) {
+            throw SyscallException("kill");
+        }
+        cout << "smash: " + foreJob->getCmdLine() + " timed out!" << endl;
+        SmallShell::getInstance().removeForegroundJob();
+    }
+
+    JobsList* jobsList = SmallShell::getInstance().getJobsList();
+    jobsList->terminateTimedOutJobs();
+    SmallShell::getInstance().refreshTimeout();
 }
 

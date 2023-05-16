@@ -48,13 +48,14 @@ public:
 
 class ExternalCommand: public Command {
  public:
-  explicit ExternalCommand(const char* cmd_line, bool isPipe);
+  explicit ExternalCommand(const char* cmd_line, bool isPipe, int timeout);
   virtual ~ExternalCommand() = default;
   void execute() override;
 
 private:
     bool isSimple;
     bool isPipe;
+    int m_timeoutSecs;
 
     void execSimpleCommand();
     void execComplexChild();
@@ -142,7 +143,7 @@ class JobsList {
 public:
     class JobEntry {
     public:
-        JobEntry(int jobId, int jobPid, const char* cmdLine, bool isStopped);
+        JobEntry(int jobId, int jobPid, const char* cmdLine, bool isStopped, int timoutSecs);
         bool isJobStopped() const;
         pid_t getPid() const;
         int getJobId() const;
@@ -151,6 +152,9 @@ public:
         void printCmdLine() const;
         void continueJob();
         void stopJob();
+        int getTimeDiff() const;
+        bool isTimedOut() const;
+        int getTimeout() const;
 
     private:
         int m_jobId;
@@ -158,13 +162,14 @@ public:
         string m_cmdLine;
         bool m_isStopped;
         time_t m_insertTime;
+        int m_timeoutSecs;
 
       // TODO: pointer to last stopped job?
   };
  public:
     JobsList() = default;
     ~JobsList();
-    void addJob(const char* rawCmdLine, pid_t pid, int jobId, bool isStopped = false);
+    void addJob(const char* rawCmdLine, pid_t pid, int jobId, bool isStopped, int timeout);
     void printJobsList();
     void killAllJobs();
     void removeFinishedJobs();
@@ -175,6 +180,7 @@ public:
     int getMaxJobId() const;
     bool isEmpty() const;
     ::size_t getNumJobs() const;
+    void terminateTimedOutJobs();
 //  JobEntry* getJobById(char* jobId) const;
 
 private:
@@ -225,15 +231,15 @@ private:
 
 };
 
-//class TimeoutCommand : public BuiltInCommand {
-//public:
-//    explicit TimeoutCommand(const char* cmd_line);
-//    virtual ~TimeoutCommand() {}
-//    void execute() override;
-//private:
-//    Command* m_cmd;
-//    unsigned int m_secs;
-//};
+class TimeoutCommand : public BuiltInCommand {
+public:
+    explicit TimeoutCommand(const char* cmd_line);
+    ~TimeoutCommand() override;
+    void execute() override;
+private:
+    Command* m_cmd;
+    int m_secs;
+};
 
 class GetFileTypeCommand : public BuiltInCommand {
  public:
@@ -268,14 +274,29 @@ private:
     static const char KILL_SIGNAL_PREFIX = '-';
 };
 
+class Timeout {
+public:
+    Timeout(int id, int timeoutSecs);
+//   bool isDone() const;
+    int getDiff() const;
+    int getId() const;
+private:
+    int m_id;
+    time_t m_insertTime;
+    int m_timeoutSecs;
+};
+
 class SmallShell {
 private:
     SmallShell();
     std::string m_smashPrompt;
     JobsList* jobs;
+    map<int, Timeout*> timeoutMap;
     JobsList::JobEntry* m_foregroundJob;
     string m_lastPwd;
     string m_currPwd;
+    Timeout* m_minTimeout;
+    int m_timeoutCounter;
 
 public:
     Command *CreateCommand(const char* cmd_line);
@@ -301,8 +322,10 @@ public:
     JobsList::JobEntry* getForegroundJob() const;
     void setForegroundJob(JobsList::JobEntry* jobEntry);
     void removeForegroundJob();
+    void addTimeout(int timeoutSecs);
+    void refreshTimeout();
 
-    static Command* findCommand(const char* cmd_line, bool isPipe = false);
+    static Command* findCommand(const char* cmd_line, bool isPipe, int timeout = -1);
 
     static const int RET_VALUE_ERROR = -1;
 };
