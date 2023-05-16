@@ -606,8 +606,8 @@ void ExternalCommand::execSimpleCommand() {
 
 void ExternalCommand::execComplexChild() {
     setpgrp();
-    char* bashArgs[] = {(char*)"-c", (char*)m_cmdLine, nullptr};
-    if(execvp("/bin/bash", bashArgs) == RET_VALUE_ERROR)
+    char* bashArgs[] = {(char*)"bash",(char*)"-c", (char*)m_cmdLine, nullptr};
+    if(execvp("bash", bashArgs) == RET_VALUE_ERROR)
         throw SyscallException("execvp", true);
 }
 
