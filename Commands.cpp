@@ -6,7 +6,7 @@
 #include <sstream>
 #include <sys/wait.h>
 #include <sys/stat.h>
-//#include <sys/sysinfo.h>
+#include <sys/sysinfo.h>
 #include <sys/stat.h>
 #include <sched.h>
 #include <iomanip>
@@ -152,7 +152,8 @@ void SmallShell::removeForegroundJob() {
 Command::Command(const char *cmd_line):
     m_rawCmdLine(cmd_line)
 {
-    m_cmdLine = _removeBackgroundSign(cmd_line).c_str();
+    string cmdLineCopy = _trim(_removeBackgroundSign(cmd_line));
+    m_cmdLine = cmdLineCopy.c_str();
     int numArgs = _parseCommandLine(m_cmdLine, m_args)-1;
     this->m_numArgs = numArgs;
 
@@ -233,14 +234,13 @@ Command *SmallShell::findCommand(const char *cmd_line, bool isPipe) {
         return cdCom;
     }
 
-    //
-    //  else if(commandStr == "setcore") {
-    //      return new SetcoreCommand(cmd_line, getJobsList());
-    //  }
+    else if(commandStr == "setcore") {
+        return new SetcoreCommand(cmd_line, SmallShell::getInstance().getJobsList());
+    }
 
-      else if(commandStr == "chmod") {
-          return new ChmodCommand(cmd_line);
-      }
+    else if(commandStr == "chmod") {
+        return new ChmodCommand(cmd_line);
+    }
 
     else if(commandStr == "fg") {
         return new ForegroundCommand(cmd_line, SmallShell::getInstance().getJobsList());
@@ -613,7 +613,6 @@ void ExternalCommand::execComplexChild() {
 
 void ExternalCommand::execSimpleChild() {
     if(execvp(m_args[0], m_args)== RET_VALUE_ERROR) {
-//        SmallShell::getInstance().getJobsList()->getJobById()
         throw SyscallException("execvp", true);
     }
 }
@@ -690,7 +689,7 @@ void PipeCommand::execute() {
         safeClose(fd[0], true);
         safeClose(fd[1], true);
         m_src->execute();
-        ::exit(0); // We exit because builtin commands don't use execv and will return from execute
+        exit(0); // We exit because builtin commands don't use execv and will return from execute
     } else if(srcPid < 0) {
         throw SyscallException("fork");
     }
@@ -703,14 +702,23 @@ void PipeCommand::execute() {
         safeClose(fd[0], true);
         safeClose(fd[1], true);
         m_dest->execute();
-        ::exit(0);
+        exit(0);
     } else if(destPid < 0) {
         throw SyscallException("fork");
     }
-    waitpid(srcPid, nullptr, 0);
-    waitpid(destPid, nullptr, 0);
+
     safeClose(fd[0]);
     safeClose(fd[1]);
+
+    if(waitpid(srcPid, nullptr, 0) == RET_VALUE_ERROR) {
+        throw SyscallException("waitpid");
+    }
+
+    if(waitpid(destPid, nullptr, 0) == RET_VALUE_ERROR) {
+        throw SyscallException("waitpid");
+    }
+
+
 }
 
 void PipeCommand::safeClose(int fd, bool isChild) {
@@ -719,42 +727,42 @@ void PipeCommand::safeClose(int fd, bool isChild) {
     }
 }
 
-//SetcoreCommand::SetcoreCommand(const char *cmd_line, JobsList* jobs) :
-//    BuiltInCommand(cmd_line)
-//{
-//    int requestedJobId = 0;
-//    int requestedCore = 0;
-//
-//    try {
-//        if(m_numArgs == Command::NO_ARGS) {
-//            throw SetCoreInvalidArguments();
-//        }
-//        requestedJobId = stoi(m_args[1]);
-//        requestedCore = stoi(m_args[2]);
-//        m_setCoreJob = jobs->getJobById(requestedJobId);
-//        if(requestedCore >= get_nprocs() || requestedCore < 0) {
-//            throw SetCoreInvalidCoreError();
-//        }
-//        m_core = requestedCore;
-//    }
-//
-//    catch (invalid_argument& invalidArgument) {
-//        throw SetCoreInvalidArguments();
-//    }
-//
-//    catch (JobNotFoundError& jobNotFoundError) {
-//        throw SetCoreJobNotFoundError(requestedJobId);
-//    }
-//}
-//
-//void SetcoreCommand::execute() {
-//    cpu_set_t jobCPUMask;
-//    CPU_ZERO(&jobCPUMask);
-//    CPU_SET(m_core, &jobCPUMask);
-//    if(sched_setaffinity(m_setCoreJob->getPid(), sizeof(jobCPUMask), &jobCPUMask) == RET_VALUE_ERROR) {
-//        throw SyscallException("sched_setaffinity");
-//    }
-//}
+SetcoreCommand::SetcoreCommand(const char *cmd_line, JobsList* jobs) :
+    BuiltInCommand(cmd_line)
+{
+    int requestedJobId = 0;
+    int requestedCore = 0;
+
+    try {
+        if(m_numArgs == Command::NO_ARGS) {
+            throw SetCoreInvalidArguments();
+        }
+        requestedJobId = stoi(m_args[1]);
+        requestedCore = stoi(m_args[2]);
+        m_setCoreJob = jobs->getJobById(requestedJobId);
+        if(requestedCore >= get_nprocs() || requestedCore < 0) {
+            throw SetCoreInvalidCoreError();
+        }
+        m_core = requestedCore;
+    }
+
+    catch (invalid_argument& invalidArgument) {
+        throw SetCoreInvalidArguments();
+    }
+
+    catch (JobNotFoundError& jobNotFoundError) {
+        throw SetCoreJobNotFoundError(requestedJobId);
+    }
+}
+
+void SetcoreCommand::execute() {
+    cpu_set_t jobCPUMask;
+    CPU_ZERO(&jobCPUMask);
+    CPU_SET(m_core, &jobCPUMask);
+    if(sched_setaffinity(m_setCoreJob->getPid(), sizeof(jobCPUMask), &jobCPUMask) == RET_VALUE_ERROR) {
+        throw SyscallException("sched_setaffinity");
+    }
+}
 
 
 ChmodCommand::ChmodCommand(const char *cmd_line) :
