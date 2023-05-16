@@ -14,7 +14,7 @@ using namespace std;
 
 class Command {
 public:
-    explicit Command(const char* cmd_line);
+    explicit Command(const char* cmd_line, bool skipBgRemove = false);
     virtual ~Command();
     virtual void execute() = 0;
   //virtual void prepare();

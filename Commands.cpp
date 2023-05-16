@@ -149,10 +149,15 @@ void SmallShell::removeForegroundJob() {
     m_foregroundJob = nullptr;
 }
 
-Command::Command(const char *cmd_line):
+Command::Command(const char *cmd_line, bool skipBgRemove):
     m_rawCmdLine(cmd_line)
 {
-    string cmdLineCopy = _trim(_removeBackgroundSign(cmd_line));
+    string cmdLineCopy;
+    if(skipBgRemove) {
+        cmdLineCopy = _trim(cmd_line);
+    } else {
+        cmdLineCopy = _trim(_removeBackgroundSign(cmd_line));
+    }
     m_cmdLine = cmdLineCopy.c_str();
     int numArgs = _parseCommandLine(m_cmdLine, m_args)-1;
     this->m_numArgs = numArgs;
@@ -234,7 +239,7 @@ Command *SmallShell::findCommand(const char *cmd_line, bool isPipe) {
         return cdCom;
     }
 
-    else if(commandStr == "setcore") {
+   else if(commandStr == "setcore") {
         return new SetcoreCommand(cmd_line, SmallShell::getInstance().getJobsList());
     }
 
@@ -612,7 +617,7 @@ void ExternalCommand::execComplexChild() {
 }
 
 void ExternalCommand::execSimpleChild() {
-    if(execvp(m_args[0], m_args)== RET_VALUE_ERROR) {
+    if(execvp(m_args[0], m_args) == RET_VALUE_ERROR) {
         throw SyscallException("execvp", true);
     }
 }
@@ -627,10 +632,10 @@ RedirectionCommand::RedirectionCommand(const char *cmd_line):
     string delimiter;
     if(string(cmd_line).find(">>") != string::npos) {
         delimiter = ">>";
-        m_overrideContent = true;
+        m_overrideContent = false;
     } else {
         delimiter = ">";
-        m_overrideContent = false;
+        m_overrideContent = true;
     }
 
     string commands[2];
@@ -644,8 +649,17 @@ void RedirectionCommand::execute() {
     if(pid == 0) {
         setpgrp();
     // Close stdout fd so that when we open a file it will point the file object
-        close(1);
-        open(m_fileName.c_str(), O_CREAT, 655);
+        if(close(STDOUT_FILENO) == RET_VALUE_ERROR) {
+            throw SyscallException("close");
+        }
+
+        int openMode = O_RDWR | O_CREAT;
+        if(!m_overrideContent) {
+            openMode = openMode | O_APPEND;
+        } else {
+            openMode = openMode | O_TRUNC;
+        }
+        open(m_fileName.c_str(), openMode, 0666);
         m_cmd->execute();
         exit(0);
     } else if(pid < 0) {
@@ -655,7 +669,7 @@ void RedirectionCommand::execute() {
 }
 
 PipeCommand::PipeCommand(const char *cmd_line):
-    Command(cmd_line)
+    Command(cmd_line, true)
 {
     string delimiter;
     if(string(cmd_line).find("|&") != string::npos) {
@@ -668,8 +682,6 @@ PipeCommand::PipeCommand(const char *cmd_line):
 
     string commands[2];
     Command::splitCommand(string(cmd_line), delimiter, commands);
-    cout << commands[0] << endl;
-    cout << commands[1] << endl;
     m_src = SmallShell::findCommand(commands[0].c_str(), true);
     m_dest = SmallShell::findCommand(commands[1].c_str(), true);
 }
@@ -687,6 +699,10 @@ void PipeCommand::execute() {
         setpgrp();
         // Map stdout to pipe write
         dup2(fd[1], pipeOut);
+        if(m_useStderr) {
+            dup2(2, 1);
+        }
+
         safeClose(fd[0], true);
         safeClose(fd[1], true);
         m_src->execute();
@@ -907,9 +923,6 @@ JobsList::JobEntry* JobsList::getJobById(int jobId) {
 
     return jobIterator->second;
 }
-
-// TODO: should the clock keep going if job is stopped?
-// TODO: should continue job if SIGCONT was sent
 
 bool JobsList::isEmpty() const {
     return jobs.empty();
