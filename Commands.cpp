@@ -171,8 +171,8 @@ Command::~Command() {
 }
 
 void Command::splitCommand(const string& str, const string& delimiter, string commands[2]) {
-    commands[0] = str.substr(0, str.find(delimiter));
-    commands[1] = str.substr(commands[0].length() + delimiter.length(), str.length());
+    commands[0] = _trim(str.substr(0, str.find(delimiter)));
+    commands[1] = _trim(str.substr(commands[0].length() + delimiter.length()+1, str.length()));
 }
 
 bool Command::hasBackgroundSign(string cmd_line) {
@@ -233,7 +233,7 @@ Command *SmallShell::findCommand(const char *cmd_line, bool isPipe) {
         SmallShell::getInstance().setLastDir(SmallShell::getInstance().getCurrDir());
         return cdCom;
     }
-    
+
     else if(commandStr == "setcore") {
         return new SetcoreCommand(cmd_line, SmallShell::getInstance().getJobsList());
     }
@@ -645,7 +645,6 @@ void RedirectionCommand::execute() {
         setpgrp();
     // Close stdout fd so that when we open a file it will point the file object
         close(1);
-        // TODO: should i close  the file?
         open(m_fileName.c_str(), O_CREAT, 655);
         m_cmd->execute();
         exit(0);
@@ -669,6 +668,8 @@ PipeCommand::PipeCommand(const char *cmd_line):
 
     string commands[2];
     Command::splitCommand(string(cmd_line), delimiter, commands);
+    cout << commands[0] << endl;
+    cout << commands[1] << endl;
     m_src = SmallShell::findCommand(commands[0].c_str(), true);
     m_dest = SmallShell::findCommand(commands[1].c_str(), true);
 }
