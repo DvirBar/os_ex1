@@ -773,7 +773,7 @@ ChmodCommand::ChmodCommand(const char *cmd_line) :
     try {
         if (m_numArgs != CHMOD_NUM_ARGS)
             throw ChmodInvalidArguments();
-        requestedMode = stoi(m_args[1]);
+        requestedMode = stoi(m_args[1],0, 8);
         m_path = m_args[2];
         m_mode = requestedMode;
     }
