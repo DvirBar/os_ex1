@@ -233,7 +233,7 @@ Command *SmallShell::findCommand(const char *cmd_line, bool isPipe) {
         SmallShell::getInstance().setLastDir(SmallShell::getInstance().getCurrDir());
         return cdCom;
     }
-
+    
     else if(commandStr == "setcore") {
         return new SetcoreCommand(cmd_line, SmallShell::getInstance().getJobsList());
     }
@@ -781,6 +781,13 @@ ChmodCommand::ChmodCommand(const char *cmd_line) :
     }
 }
 
+void ChmodCommand::execute() {
+    if(chmod(m_path, m_mode) == RET_VALUE_ERROR) {
+        throw SyscallException("chmod");
+    }
+}
+
+
 GetFileTypeCommand::GetFileTypeCommand(const char *cmd_line):
     BuiltInCommand(cmd_line)
 {
@@ -855,11 +862,7 @@ void GetFileTypeCommand::execute() {
 
 
 
-void ChmodCommand::execute() {
-    if(chmod(m_path, m_mode) == RET_VALUE_ERROR) {
-        throw SyscallException("chmod");
-    }
-}
+
 
 /* --------------------------------------------------- JOBS LIST ---------------------------------------------------- */
 JobsList::~JobsList() {
