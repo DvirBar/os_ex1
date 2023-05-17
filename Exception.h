@@ -119,7 +119,7 @@ private:
 class FileTypeInvalidArgs: public exception {
 public:
     const char* what() const noexcept override {
-        return "smash error: gettype: invalid arguments";
+        return "smash error: getfiletype: invalid arguments";
     }
 };
 

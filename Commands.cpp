@@ -499,6 +499,7 @@ BackgroundCommand::BackgroundCommand(const char *cmd_line, JobsList *jobs) :
 {
     int requestedJobID = 0;
     try {
+
         if(m_numArgs == Command::NO_ARGS) {
             m_bgJob = jobs->getLastStoppedJob();
         }
@@ -1135,7 +1136,7 @@ void JobsList::printJobsList() {
 
 JobsList::JobEntry*  JobsList::getLastStoppedJob() {
     if(jobs.empty()) {
-        return nullptr;
+        throw NoStoppedJobs();
     }
     JobEntry* jobEntry = jobs.begin()->second;
     for(auto job: jobs) {
