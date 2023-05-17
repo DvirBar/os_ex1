@@ -311,7 +311,6 @@ Command *SmallShell::findCommand(const char *cmd_line, bool isPipe, int timeout)
         auto lastPwd = getInstance().getLastDir();
         auto currPwd = getInstance().getCurrDir();
         auto cdCom = new ChangeDirCommand(cmd_line, &lastPwd);
-        SmallShell::getInstance().setLastDir(SmallShell::getInstance().getCurrDir());
         return cdCom;
     }
 
@@ -431,11 +430,13 @@ ChangeDirCommand::ChangeDirCommand(const char *cmd_line, string* plastPwd):
 }
 // TODO: fix
 void ChangeDirCommand::execute() {
+    string lastDir = SmallShell::getInstance().getCurrDir();
     int retValue = chdir(m_targetPwd.c_str());
     if(retValue == RET_VALUE_ERROR) {
         throw SyscallException("chdir");
     }
 
+    SmallShell::getInstance().setLastDir(lastDir);
     SmallShell::getInstance().setCurrDir(getcwd(nullptr, 0));
 }
 
