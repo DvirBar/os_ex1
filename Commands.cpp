@@ -208,6 +208,10 @@ void SmallShell::refreshTimeout() {
 Command::Command(const char *cmd_line, bool skipBgRemove):
     m_rawCmdLine(cmd_line)
 {
+    for(int i=0; i<CMD_MAX_NUM_ARGS+1; i++) {
+        m_args[i] = nullptr;
+    }
+
     string cmdLineCopy;
     if(skipBgRemove) {
         cmdLineCopy = _trim(cmd_line);
