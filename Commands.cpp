@@ -527,6 +527,9 @@ BackgroundCommand::BackgroundCommand(const char *cmd_line, JobsList *jobs) :
 
 
 void BackgroundCommand::execute() {
+    if(m_bgJob == nullptr) {
+        return;
+    }
     m_bgJob->printCmdLine();
     m_bgJob->continueJob();
     if(kill(m_bgJob->getPid(), SIGCONT) == RET_VALUE_ERROR) {
@@ -1131,13 +1134,15 @@ void JobsList::printJobsList() {
 }
 
 JobsList::JobEntry*  JobsList::getLastStoppedJob() {
+    if(jobs.empty()) {
+        return nullptr;
+    }
     JobEntry* jobEntry = jobs.begin()->second;
     for(auto job: jobs) {
         if(job.second->isJobStopped())
             jobEntry = job.second;
     }
     if(!jobEntry->isJobStopped()) {
-        // TODO:
         throw NoStoppedJobs();
     }
 
