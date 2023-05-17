@@ -93,7 +93,7 @@ public:
     }
 };
 
-class NoStoppedJobs {};
+class NoStoppedJobs: public exception {};
 
 class KillInvalidArgumentsError : public exception {
 public:

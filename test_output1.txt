@@ -1,2 +1,1 @@
-smash> /Users/dvirbartov/Programming/university/operatingSystems/hw1
-smash> 
+smash> smash> hello> hello> hello> hello> smash> smash> smash> smash: sending SIGKILL signal to 0 jobs:

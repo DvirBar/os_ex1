@@ -415,8 +415,6 @@ ChangeDirCommand::ChangeDirCommand(const char *cmd_line, string* plastPwd):
         throw TooManyArgsError();
     }
 
-    // TODO: check for the same path
-    // TODO: more exceptions?
     char* arg = m_args[1];
 
     if(arg == string("-")) {
@@ -428,7 +426,7 @@ ChangeDirCommand::ChangeDirCommand(const char *cmd_line, string* plastPwd):
         m_targetPwd = arg;
     }
 }
-// TODO: fix
+
 void ChangeDirCommand::execute() {
     string lastDir = SmallShell::getInstance().getCurrDir();
     int retValue = chdir(m_targetPwd.c_str());
@@ -440,7 +438,6 @@ void ChangeDirCommand::execute() {
     SmallShell::getInstance().setCurrDir(getcwd(nullptr, 0));
 }
 
-// TODO: commands that don't exist are added to jobs
 JobsCommand::JobsCommand(const char *cmd_line, JobsList *jobs) :
     BuiltInCommand(cmd_line)
 { }
@@ -547,10 +544,9 @@ QuitCommand::QuitCommand(const char *cmd_line, JobsList *jobs):
     }
 }
 
-// TODO: quit causes segfault when used with kill
 void QuitCommand::execute() {
     if(execKill) {
-        cout << "sending SIGKILL signal to " << m_jobs->getNumJobs() << " jobs:" << endl;
+        cout << "smash: sending SIGKILL signal to " << m_jobs->getNumJobs() << " jobs:" << endl;
         m_jobs->killAllJobs();
     }
 
