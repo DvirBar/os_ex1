@@ -489,7 +489,7 @@ void ForegroundCommand::execute() {
     m_jobs->removeJobById(m_job->getJobId(), false);
     SmallShell::getInstance().setForegroundJob(m_job);
 
-    if(waitpid(m_job->getPid(), nullptr, 0) == RET_VALUE_ERROR) {
+    if(waitpid(m_job->getPid(), nullptr, WUNTRACED) == RET_VALUE_ERROR) {
         throw SyscallException("waitpid");
     }
 }
