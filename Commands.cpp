@@ -1006,7 +1006,7 @@ bool JobsList::isEmpty() const {
 }
 
 void JobsList::terminateTimedOutJobs() {
-    for(auto it = jobs.begin(); it->first != jobs.end()->first;) {
+    for(auto it = jobs.begin(); it != jobs.end();) {
         if(it->second->isTimedOut()) {
             JobEntry* jobEntry = it->second;
             if(kill(jobEntry->getPid(), SIGKILL) == RET_VALUE_ERROR) {
