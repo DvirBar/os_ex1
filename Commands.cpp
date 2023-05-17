@@ -1108,7 +1108,7 @@ void JobsList::removeFinishedJobs() {
         return;
     }
 
-    for (auto it = jobs.begin(); it->first != jobs.end()->first;) {
+    for (auto it = jobs.begin(); it != jobs.end();) {
         waitpidCheck = waitpid(it->second->getPid(), &status, WNOHANG);
         if(waitpidCheck > 0) {
             JobEntry* jobEntry = getJobById(it->first);
